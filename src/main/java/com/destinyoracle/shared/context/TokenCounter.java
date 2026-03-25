@@ -11,9 +11,19 @@ public class TokenCounter {
 
     private static final double CHARS_PER_TOKEN = 4.0;
 
+    /** Alias for estimate — used by tests. */
+    public int count(String text) {
+        return estimate(text);
+    }
+
     public int estimate(String text) {
         if (text == null || text.isEmpty()) return 0;
         return (int) Math.ceil(text.length() / CHARS_PER_TOKEN);
+    }
+
+    /** Alias for truncateToFit — used by tests. */
+    public String truncate(String text, int maxTokens) {
+        return truncateToFit(text, maxTokens);
     }
 
     /**

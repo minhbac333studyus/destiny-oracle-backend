@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * REST client for Mem0 long-term memory sidecar.
@@ -25,11 +26,22 @@ public class Mem0Client {
 
     private final RestClient restClient;
 
+    /** Primary constructor for Spring injection. */
     public Mem0Client(
         @Value("${mem0.base-url:http://localhost:8888}") String baseUrl,
         RestClient.Builder builder
     ) {
         this.restClient = builder.baseUrl(baseUrl).build();
+    }
+
+    /** Test-friendly constructor (reversed param order). */
+    public Mem0Client(RestClient.Builder builder, String baseUrl) {
+        this.restClient = builder.baseUrl(baseUrl).build();
+    }
+
+    /** Constructor accepting a pre-built RestClient (for tests with WireMock). */
+    public Mem0Client(RestClient restClient) {
+        this.restClient = restClient;
     }
 
     // ── Data classes ──────────────────────────────────────
@@ -52,20 +64,26 @@ public class Mem0Client {
         @JsonProperty("results") List<Mem0Memory> results
     ) {}
 
-    // ── Public API ────────────────────────────────────────
+    // ── Public API ─────────────────────────────────────────
 
-    /**
-     * Add memories from a conversation exchange.
-     * Mem0 auto-extracts facts ("user is vegetarian", "user has bad knee").
-     */
+    /** Add memory — accepts String userId for convenience. */
+    public List<Mem0Memory> addMemory(String userId, String userMessage, String assistantResponse) {
+        return addMemoryInternal(userId, userMessage, assistantResponse);
+    }
+
+    /** Add memory — accepts UUID userId. */
     public List<Mem0Memory> addMemory(UUID userId, String userMessage, String assistantResponse) {
+        return addMemoryInternal(userId.toString(), userMessage, assistantResponse);
+    }
+
+    private List<Mem0Memory> addMemoryInternal(String userId, String userMessage, String assistantResponse) {
         try {
             var body = Map.of(
                 "messages", List.of(
                     Map.of("role", "user", "content", userMessage),
                     Map.of("role", "assistant", "content", assistantResponse)
                 ),
-                "user_id", userId.toString()
+                "user_id", userId
             );
 
             var response = restClient.post()
@@ -85,13 +103,28 @@ public class Mem0Client {
     }
 
     /**
-     * Semantic search for relevant memories based on user's new message.
+     * Semantic search returning formatted string — used by ContextAssembler and tests.
+     */
+    public String searchMemories(String userId, String query) {
+        var memories = searchMemoriesRaw(userId, query, 5);
+        if (memories.isEmpty()) return "";
+        return memories.stream()
+            .map(Mem0Memory::memory)
+            .collect(Collectors.joining("\n- ", "KNOWN FACTS:\n- ", ""));
+    }
+
+    /**
+     * Semantic search for relevant memories — returns raw list.
      */
     public List<Mem0Memory> searchMemories(UUID userId, String query, int limit) {
+        return searchMemoriesRaw(userId.toString(), query, limit);
+    }
+
+    private List<Mem0Memory> searchMemoriesRaw(String userId, String query, int limit) {
         try {
             var body = Map.of(
                 "query", query,
-                "user_id", userId.toString(),
+                "user_id", userId,
                 "limit", limit
             );
 

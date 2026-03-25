@@ -36,11 +36,31 @@ public class XpCalculator {
         this.eventPublisher = eventPublisher;
     }
 
+    private static final int STEP_XP = 15;
+    private static final int TASK_COMPLETE_XP = 50;
+
+    /**
+     * Award XP for completing a single task step (15 XP).
+     */
+    public void awardTaskStepXp(UUID cardId) {
+        if (cardId == null) return;
+        awardXp(cardId, STEP_XP);
+    }
+
+    /**
+     * Award bonus XP for completing all steps of a task (50 XP).
+     */
+    public void awardTaskCompleteXp(UUID cardId) {
+        if (cardId == null) return;
+        awardXp(cardId, TASK_COMPLETE_XP);
+    }
+
     /**
      * Award XP to a card and check for stage advancement.
      */
     @Transactional
     public void awardXp(UUID cardId, int xp) {
+        if (cardId == null) return;
         var cardOpt = cardRepo.findById(cardId);
         if (cardOpt.isEmpty()) {
             log.warn("Card {} not found for XP award", cardId);
@@ -77,8 +97,9 @@ public class XpCalculator {
 
         log.info("Card {} advanced: {} → {}", card.getId(), oldStageName, nextStage.name());
 
+        UUID userId = card.getUser() != null ? card.getUser().getId() : null;
         eventPublisher.publishEvent(new StageAdvancedEvent(
-            card.getId(), card.getUser().getId(), oldStageName, nextStage.name()
+            card.getId(), userId, oldStageName, nextStage.name()
         ));
     }
 
