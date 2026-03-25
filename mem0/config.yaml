@@ -1,0 +1,28 @@
+# mem0/config.yaml
+llm:
+  provider: "anthropic"
+  config:
+    model: "claude-3-5-haiku-latest"
+    api_key: "${ANTHROPIC_API_KEY}"  # reuse your existing key
+
+embedder:
+  provider: "ollama"
+  config:
+    model: "nomic-embed-text"
+    ollama_base_url: "http://ollama:11434"  # Docker service name
+
+vector_store:
+  provider: "pgvector"
+  config:
+    host: "mem0-pgvector"
+    port: 5432
+    user: "postgres"
+    password: "${MEM0_POSTGRES_PASSWORD}"
+    dbname: "postgres"
+
+graph_store:
+  provider: "neo4j"
+  config:
+    url: "bolt://mem0-neo4j:7687"
+    username: "neo4j"
+    password: "${MEM0_NEO4J_PASSWORD}"

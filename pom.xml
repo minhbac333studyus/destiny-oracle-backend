@@ -92,6 +92,18 @@
     <!-- Gemini image generation uses the built-in Java HttpClient (java.net.http) -->
     <!-- No extra Google SDK needed — plain REST with ?key=API_KEY auth          -->
 
+    <!-- WebFlux (needed for SSE streaming Flux<String> in chat) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webflux</artifactId>
+    </dependency>
+
+    <!-- Jackson (JSON serialization, already pulled by spring-boot-starter-web but explicit for clarity) -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
     <!-- OpenAPI / Swagger UI -->
     <dependency>
       <groupId>org.springdoc</groupId>

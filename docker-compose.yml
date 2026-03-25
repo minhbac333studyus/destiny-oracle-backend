@@ -1,0 +1,128 @@
+services:
+
+  # ── YOUR APP ───────────────────────────────────────
+  destiny-oracle:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_CLOUD_PROJECT_ID=${GOOGLE_CLOUD_PROJECT_ID}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-us-central1}
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/destiny_oracle
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD}
+      - MEM0_BASE_URL=http://mem0:8000
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:4200}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mem0:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ── YOUR DATABASE ──────────────────────────────────
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=destiny_oracle
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "destiny_oracle"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # ── OLLAMA (CPU embeddings — no GPU needed) ────────
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ── MEM0 API SERVER ────────────────────────────────
+  mem0:
+    build:
+      context: ./mem0
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8888:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - MEM0_POSTGRES_PASSWORD=${MEM0_POSTGRES_PASSWORD:-mem0pass}
+      - MEM0_NEO4J_PASSWORD=${MEM0_NEO4J_PASSWORD:-mem0graph}
+    volumes:
+      - mem0_history:/app/history
+      - ./mem0/config.yaml:/app/config.yaml:ro
+    depends_on:
+      mem0-pgvector:
+        condition: service_healthy
+      mem0-neo4j:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ── MEM0 VECTOR DB ────────────────────────────────
+  mem0-pgvector:
+    image: ankane/pgvector:v0.5.1
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${MEM0_POSTGRES_PASSWORD:-mem0pass}
+    volumes:
+      - mem0_pgvector_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:8432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # ── MEM0 GRAPH DB ─────────────────────────────────
+  mem0-neo4j:
+    image: neo4j:5.26.4-community
+    environment:
+      - NEO4J_AUTH=neo4j/${MEM0_NEO4J_PASSWORD:-mem0graph}
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - mem0_neo4j_data:/data
+    ports:
+      - "127.0.0.1:7687:7687"
+      - "127.0.0.1:7474:7474"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  ollama_data:
+  mem0_history:
+  mem0_pgvector_data:
+  mem0_neo4j_data:
+
+networks:
+  app-network:
+    driver: bridge

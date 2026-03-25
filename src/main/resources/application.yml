@@ -69,6 +69,23 @@ management:
     health:
       show-details: always
 
+# Mem0 long-term memory sidecar
+mem0:
+  base-url: ${MEM0_BASE_URL:http://localhost:8888}
+
+# Push notification config (Phase 3)
+push:
+  apns:
+    key-path: ${PUSH_APNS_KEY_PATH:}
+    team-id: ${PUSH_APNS_TEAM_ID:}
+    key-id: ${PUSH_APNS_KEY_ID:}
+    topic: ${PUSH_APNS_TOPIC:com.yourapp.destinyoracle}
+    production: ${PUSH_APNS_PRODUCTION:false}
+  web:
+    public-key: ${PUSH_WEB_PUBLIC_KEY:}
+    private-key: ${PUSH_WEB_PRIVATE_KEY:}
+    subject: ${PUSH_WEB_SUBJECT:mailto:admin@destinyoracle.app}
+
 # App-level config (Image generation, GCS, CORS, default user)
 app:
   # Image provider: "gemini" or "modelslab"

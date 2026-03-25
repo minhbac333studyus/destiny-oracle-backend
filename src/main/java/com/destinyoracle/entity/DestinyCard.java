@@ -102,6 +102,18 @@ public class DestinyCard {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    // ── XP / Stage Progression (AI Assistant extension) ───
+    @Column(name = "current_xp", nullable = false)
+    @Builder.Default
+    private Integer currentXp = 0;
+
+    @Column(name = "xp_to_next_stage", nullable = false)
+    @Builder.Default
+    private Integer xpToNextStage = 100;
+
+    @Column(name = "stage_advanced_at")
+    private java.time.LocalDateTime stageAdvancedAt;
+
     // ── Relationships ─────────────────────────────────────
     //
     // stageContents — PERSIST+MERGE only, NO orphanRemoval.
