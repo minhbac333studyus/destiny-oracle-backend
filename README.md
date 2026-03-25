@@ -281,6 +281,52 @@ generation_job_steps              — 12 rows per job (6 PROMPT + 6 IMAGE)
 
 ---
 
+## AI Personal Assistant (new)
+
+The backend now includes a full AI personal assistant that transforms the app from a card creator into a daily-use AI coach.
+
+### 6 New Features
+
+| Feature | Description | Endpoints |
+|---------|-------------|-----------|
+| **AI Chat** | SSE streaming chat with Claude, 4-layer context assembly (4000-token cap), Mem0 long-term memory | `/api/v1/chat/*` |
+| **Saved Plans** | Persistent workout/meal/routine plans with versioning and slug lookup | `/api/v1/plans/*` |
+| **Tasks + XP** | AI-generated tasks with step toggles, XP awards tied to Destiny Card progression | `/api/v1/tasks/*` |
+| **Reminders** | Smart reminders with repeat (daily/weekly/monthly) and snooze | `/api/v1/reminders/*` |
+| **Nudge Engine** | Proactive 3-level escalation nudges for scheduled plans | Scheduler (every 5 min) |
+| **Daily Insights** | AI-generated daily summaries with morning push notifications | `/api/v1/insights/*` |
+
+### Memory Architecture
+
+```
+Priority 1: System prompt               300 tokens
+Priority 2: New user message             200 tokens
+Priority 3: Saved plan context           300 tokens (if relevant)
+Priority 4: Recent 10 raw messages      1500 tokens
+Priority 5: Mem0 long-term memories      400 tokens
+Priority 6: Session summary              300 tokens
+─────────────────────────────────────────────────────
+Hard cap:                               4000 tokens  (never exceeded)
+```
+
+### Docker Infrastructure (Mem0 sidecar)
+
+```bash
+docker compose up -d          # starts 6 containers
+docker compose exec ollama ollama pull nomic-embed-text  # one-time
+curl http://localhost:8888/   # verify Mem0 is running
+```
+
+Containers: app, postgres, ollama (CPU embeddings), mem0, mem0-pgvector, mem0-neo4j
+
+### Unit Tests
+
+```bash
+mvn test -Dtest="com.destinyoracle.unit.**"   # 38 tests, all free ($0)
+```
+
+---
+
 ## Archive / Chapter System (planned)
 
 When a user completes a milestone (e.g. 365-day streak) and wants to continue the same
