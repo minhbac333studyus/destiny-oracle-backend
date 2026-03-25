@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Destiny Oracle — Admin Test Console</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #07090f;
+      --surface:  #0e1117;
+      --surface2: #161b27;
+      --border:   #1e2535;
+      --gold:     #f0c060;
+      --accent:   #7b6ef6;
+      --text:     #c8d0e0;
+      --muted:    #5a6478;
+      --danger:   #f87171;
+      --green:    #4ade80;
+      --blue:     #60a5fa;
+      --orange:   #fb923c;
+      --success-bg: rgba(74,222,128,0.08);
+      --error-bg:   rgba(248,113,113,0.08);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────── */
+    .sidebar {
+      width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 0;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    .sidebar-logo {
+      padding: 0 16px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .sidebar-logo h2 {
+      color: var(--gold);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .sidebar-logo p { color: var(--muted); font-size: 0.72rem; margin-top: 2px; }
+
+    .section-label {
+      padding: 12px 16px 4px;
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 16px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 0.83rem;
+      cursor: pointer;
+      text-align: left;
+      border-radius: 0;
+      transition: background 0.15s;
+    }
+    .nav-btn:hover { background: rgba(123,110,246,0.1); }
+    .nav-btn.active { background: rgba(123,110,246,0.18); color: var(--accent); font-weight: 600; }
+    .nav-btn .method {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+      min-width: 36px;
+      text-align: center;
+    }
+    .method-get    { background: rgba(96,165,250,0.2);  color: var(--blue); }
+    .method-post   { background: rgba(74,222,128,0.2);  color: var(--green); }
+    .method-patch  { background: rgba(251,146,60,0.2);  color: var(--orange); }
+    .method-delete { background: rgba(248,113,113,0.2); color: var(--danger); }
+    .method-put    { background: rgba(240,192,96,0.2);  color: var(--gold); }
+
+    /* ── Main content ────────────────────────────────── */
+    .main {
+      margin-left: 220px;
+      flex: 1;
+      padding: 24px;
+      max-width: 1000px;
+    }
+
+    /* ── Panel ───────────────────────────────────────── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .panel-header {
+      margin-bottom: 20px;
+    }
+    .panel-header h1 {
+      color: var(--gold);
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+    .panel-header .endpoint-line {
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .method-badge {
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .endpoint-path {
+      font-family: monospace;
+      color: var(--text);
+      font-size: 0.9rem;
+      background: var(--surface2);
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    /* ── Form ────────────────────────────────────────── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .form-grid.single { grid-template-columns: 1fr; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { color: var(--muted); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; }
+    .field input, .field textarea, .field select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+      font-size: 0.83rem;
+      padding: 8px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus {
+      border-color: var(--accent);
+    }
+    .field textarea { min-height: 80px; resize: vertical; }
+    .field select option { background: var(--surface2); }
+
+    .send-btn {
+      padding: 10px 28px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .send-btn:hover { opacity: 0.85; }
+    .send-btn:active { transform: scale(0.97); }
+    .send-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* ── Response box ────────────────────────────────── */
+    .response-box {
+      margin-top: 20px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .response-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+    }
+    .response-header .status { font-weight: 700; font-family: monospace; }
+    .status-ok   { color: var(--green); }
+    .status-err  { color: var(--danger); }
+    .response-header .elapsed { color: var(--muted); margin-left: auto; }
+
+    .response-body {
+      background: var(--surface2);
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      max-height: 500px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .response-body.success { color: #86efac; }
+    .response-body.error   { color: #fca5a5; }
+
+    /* ── Config bar ──────────────────────────────────── */
+    .config-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .config-bar label { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+    .config-bar input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: monospace;
+      font-size: 0.8rem;
+      padding: 6px 10px;
+    }
+    .config-bar .uid-input { width: 280px; }
+    .config-bar .base-input { width: 200px; }
+
+    /* ── Separator ───────────────────────────────────── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+    .hint { color: var(--muted); font-size: 0.78rem; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────── -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h2>⚡ Admin Console</h2>
+    <p>Destiny Oracle Backend</p>
+  </div>
+
+  <div class="section-label">Home</div>
+  <button class="nav-btn active" onclick="show('home')">
+    🏠 Project Dashboard
+  </button>
+
+  <div class="section-label">Cards</div>
+  <button class="nav-btn" onclick="show('cards-list')">
+    <span class="method method-get">GET</span> List All Cards
+  </button>
+  <button class="nav-btn" onclick="show('cards-aspects')">
+    <span class="method method-get">GET</span> Available Aspects
+  </button>
+  <button class="nav-btn" onclick="show('cards-detail')">
+    <span class="method method-get">GET</span> Card Detail
+  </button>
+  <button class="nav-btn" onclick="show('cards-add')">
+    <span class="method method-post">POST</span> Add Card
+  </button>
+  <button class="nav-btn" onclick="show('cards-edit')">
+    <span class="method method-patch">PATCH</span> Edit Card
+  </button>
+  <button class="nav-btn" onclick="show('cards-delete')">
+    <span class="method method-delete">DELETE</span> Remove Card
+  </button>
+
+  <div class="section-label">Habits</div>
+  <button class="nav-btn" onclick="show('habit-toggle')">
+    <span class="method method-put">PUT</span> Toggle Habit
+  </button>
+
+  <div class="section-label">User Profile</div>
+  <button class="nav-btn" onclick="show('user-profile')">
+    <span class="method method-put">PUT</span> Set Chibi / Avatar
+  </button>
+
+  <div class="section-label">Pipeline Test Lab</div>
+  <button class="nav-btn" onclick="show('pipeline-lab')">
+    <span class="method method-post">POST</span> Full Pipeline Lab
+  </button>
+
+  <div class="section-label">Images</div>
+  <button class="nav-btn" onclick="show('img-prompts')">
+    <span class="method method-post">POST</span> Generate Prompts
+  </button>
+  <button class="nav-btn" onclick="show('img-all')">
+    <span class="method method-post">POST</span> Generate All Images
+  </button>
+  <button class="nav-btn" onclick="show('img-stage')">
+    <span class="method method-post">POST</span> Regen Stage Image
+  </button>
+
+  <button class="nav-btn" onclick="show('img-all-aspects')">
+    <span class="method method-post">POST</span> Generate All Aspects
+  </button>
+
+  <div class="section-label">Job Tracking</div>
+  <button class="nav-btn" onclick="show('job-tracker')">
+    <span class="method method-get">GET</span> Live Job Tracker
+  </button>
+  <button class="nav-btn" onclick="show('job-history')">
+    <span class="method method-get">GET</span> Job History
+  </button>
+
+  <div class="section-label">System</div>
+  <button class="nav-btn" onclick="show('health')">
+    <span class="method method-get">GET</span> Health Check
+  </button>
+  <button class="nav-btn" onclick="show('swagger')">
+    <span class="method method-get">GET</span> Swagger UI ↗
+  </button>
+</nav>
+
+<!-- ── Main ──────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- Global config bar -->
+  <div class="config-bar">
+    <label>Base URL</label>
+    <input class="base-input" id="baseUrl" value="http://localhost:8080" />
+    <label>X-User-Id Header</label>
+    <input class="uid-input" id="userId" value="00000000-0000-0000-0000-000000000001" />
+  </div>
+
+  <!-- ── HOME DASHBOARD ──────────────────────────────── -->
+  <div id="panel-home" class="panel active">
+    <div class="panel-header">
+      <h1>⚡ Destiny Oracle — Project Dashboard</h1>
+    </div>
+
+    <!-- Quick links -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">
+      <a href="http://localhost:8080" target="_blank" style="text-decoration:none">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:1.8rem;margin-bottom:6px">🏠</div>
+          <div style="color:var(--gold);font-weight:700;font-size:0.85rem">Landing Page</div>
+          <div style="color:var(--muted);font-size:0.72rem;margin-top:3px">localhost:8080</div>
+        </div>
+      </a>
+      <a href="http://localhost:8080/swagger-ui.html" target="_blank" style="text-decoration:none">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:1.8rem;margin-bottom:6px">📖</div>
+          <div style="color:var(--accent);font-weight:700;font-size:0.85rem">Swagger API Docs</div>
+          <div style="color:var(--muted);font-size:0.72rem;margin-top:3px">/swagger-ui.html</div>
+        </div>
+      </a>
+      <a href="http://localhost:8080/docs/er-diagram.html" target="_blank" style="text-decoration:none">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:1.8rem;margin-bottom:6px">🗺</div>
+          <div style="color:var(--blue);font-weight:700;font-size:0.85rem">ER Diagram</div>
+          <div style="color:var(--muted);font-size:0.72rem;margin-top:3px">/docs/er-diagram.html</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Server status check -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="color:var(--gold);font-weight:700;font-size:0.88rem">🟢 Server Status</span>
+        <button onclick="checkServerStatus()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem">Refresh</button>
+      </div>
+      <div id="server-status-row" style="display:flex;gap:20px;flex-wrap:wrap;font-size:0.8rem">
+        <span style="color:var(--muted)">Click Refresh to check…</span>
+      </div>
+    </div>
+
+    <!-- AI Services & API Keys -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px">
+      <div style="color:var(--gold);font-weight:700;font-size:0.9rem;margin-bottom:16px">🤖 AI Services Used — Where to Get API Keys</div>
+
+      <!-- Anthropic -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;border-left:3px solid var(--accent)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-weight:700;color:var(--text);font-size:0.88rem">🧠 Anthropic Claude — Steps 1 &amp; 2</div>
+            <div style="color:var(--muted);font-size:0.78rem;margin-top:3px">Writes stage content (title/tagline/lore) + 6 image prompts per card</div>
+            <div style="margin-top:8px;font-size:0.78rem">
+              <span style="color:var(--muted)">Model used: </span><code style="color:var(--accent)">claude-3-5-haiku-20241022</code>
+            </div>
+            <div style="margin-top:4px;font-size:0.78rem">
+              <span style="color:var(--muted)">Config: </span><code style="color:var(--text)">application.yml → spring.ai.anthropic.api-key</code>
+            </div>
+          </div>
+          <a href="https://console.anthropic.com/settings/keys" target="_blank"
+             style="background:var(--accent);color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:0.8rem;font-weight:700;white-space:nowrap">
+            Get API Key ↗
+          </a>
+        </div>
+        <div id="anthropic-status" style="margin-top:10px;font-size:0.75rem;color:var(--muted)">— not checked yet</div>
+      </div>
+
+      <!-- Google Gemini -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;border-left:3px solid var(--blue)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-weight:700;color:var(--text);font-size:0.88rem">🎨 Google Gemini Imagen 3 — Step 3</div>
+            <div style="color:var(--muted);font-size:0.78rem;margin-top:3px">Generates 6 card images in parallel via Vertex AI. Needs GCP project + billing enabled.</div>
+            <div style="margin-top:8px;font-size:0.78rem">
+              <span style="color:var(--muted)">Env vars needed: </span>
+              <code style="color:var(--blue)">GOOGLE_CLOUD_PROJECT_ID</code>
+              <code style="color:var(--blue);margin-left:6px">GCS_BUCKET</code>
+            </div>
+            <div style="margin-top:4px;font-size:0.78rem;color:var(--muted)">Auth: Application Default Credentials (run <code>gcloud auth application-default login</code>)</div>
+          </div>
+          <a href="https://console.cloud.google.com/vertex-ai" target="_blank"
+             style="background:var(--blue);color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:0.8rem;font-weight:700;white-space:nowrap">
+            GCP Console ↗
+          </a>
+        </div>
+      </div>
+
+      <!-- Google Cloud Storage -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:14px;border-left:3px solid var(--green)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-weight:700;color:var(--text);font-size:0.88rem">🪣 Google Cloud Storage — Image Storage</div>
+            <div style="color:var(--muted);font-size:0.78rem;margin-top:3px">Generated PNG images are uploaded here. URLs are stored in <code>card_images</code> table.</div>
+            <div style="margin-top:8px;font-size:0.78rem">
+              <span style="color:var(--muted)">Env var: </span><code style="color:var(--green)">GCS_BUCKET=your-bucket-name</code>
+            </div>
+          </div>
+          <a href="https://console.cloud.google.com/storage" target="_blank"
+             style="background:var(--green);color:#07090f;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:0.8rem;font-weight:700;white-space:nowrap">
+            GCS Console ↗
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Environment variables -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px">
+      <div style="color:var(--gold);font-weight:700;font-size:0.9rem;margin-bottom:12px">⚙️ Environment Variables — application.yml</div>
+      <div style="font-family:monospace;font-size:0.82rem;line-height:2">
+        <div><span style="color:var(--accent)">ANTHROPIC_API_KEY</span>=<span style="color:var(--green)">sk-ant-api03-...</span> &nbsp;<span style="color:var(--muted)">← Steps 1+2 (Claude)</span></div>
+        <div><span style="color:var(--blue)">GOOGLE_CLOUD_PROJECT_ID</span>=<span style="color:var(--green)">my-gcp-project</span> &nbsp;<span style="color:var(--muted)">← Step 3 (Gemini)</span></div>
+        <div><span style="color:var(--blue)">GCS_BUCKET</span>=<span style="color:var(--green)">my-bucket-name</span> &nbsp;<span style="color:var(--muted)">← Image storage</span></div>
+        <div><span style="color:var(--orange)">DATABASE_URL</span>=<span style="color:var(--green)">jdbc:postgresql://localhost:5432/destiny_oracle</span> &nbsp;<span style="color:var(--muted)">← optional, has default</span></div>
+      </div>
+      <div style="margin-top:12px;padding:10px;background:var(--surface);border-radius:6px;font-family:monospace;font-size:0.78rem;color:var(--muted)">
+        # How to start the server with your key<br>
+        <span style="color:var(--text)">cd destiny-oracle-backend</span><br>
+        <span style="color:var(--text)">source .env &amp;&amp; export ANTHROPIC_API_KEY</span><br>
+        <span style="color:var(--text)">JAVA_HOME=/Users/adam/Library/Java/JavaVirtualMachines/graalvm-jdk-21.0.7/Contents/Home \</span><br>
+        <span style="color:var(--text)">&nbsp;&nbsp;mvn spring-boot:run</span>
+      </div>
+    </div>
+
+    <!-- AI Pipeline reminder -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px">
+      <div style="color:var(--gold);font-weight:700;font-size:0.9rem;margin-bottom:12px">🔄 AI Pipeline — 3 Steps (mandatory order)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:12px">
+          <div style="color:var(--accent);font-weight:700;font-size:0.82rem;margin-bottom:6px">STEP 1 — Auto on card create</div>
+          <div style="color:var(--text);font-size:0.78rem">Claude reads <code>fearText</code> + <code>dreamText</code> → writes <strong>title / tagline / lore</strong> for all 6 stages</div>
+          <div style="color:var(--muted);font-size:0.72rem;margin-top:6px">StageContentGenerationServiceImpl</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--gold);border-radius:8px;padding:12px">
+          <div style="color:var(--gold);font-weight:700;font-size:0.82rem;margin-bottom:6px">STEP 2 — Manual trigger</div>
+          <div style="color:var(--text);font-size:0.78rem">Claude reads stage lore → writes <strong>6 Imagen-ready image prompts</strong>. Skipped if promptStatus=READY</div>
+          <div style="color:var(--muted);font-size:0.72rem;margin-top:6px">ImagePromptServiceImpl</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:8px;padding:12px">
+          <div style="color:var(--blue);font-weight:700;font-size:0.82rem;margin-bottom:6px">STEP 3 — Gemini Imagen</div>
+          <div style="color:var(--text);font-size:0.78rem">6 images generated <strong>in parallel</strong> (virtual threads). Needs chibi_url as style reference</div>
+          <div style="color:var(--muted);font-size:0.72rem;margin-top:6px">CardImageGenerationServiceImpl</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;text-align:center">
+        <button onclick="show('pipeline-lab')" style="background:linear-gradient(135deg,var(--accent),var(--gold));color:#07090f;border:none;padding:10px 28px;border-radius:8px;font-weight:800;font-size:0.88rem;cursor:pointer;letter-spacing:0.04em">
+          🧪 Open Pipeline Test Lab →
+        </button>
+      </div>
+    </div>
+
+    <!-- Test chibi reference -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:20px">
+      <div style="color:var(--gold);font-weight:700;font-size:0.9rem;margin-bottom:12px">🖼 Test Chibi Reference Image</div>
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+        <img src="test-chibi.png" style="width:100px;border-radius:10px;border:2px solid var(--gold)" onerror="this.style.display='none'" />
+        <div>
+          <div style="color:var(--text);font-size:0.82rem;margin-bottom:6px">Saved at: <code style="color:var(--green)">static/docs/test-chibi.png</code></div>
+          <div style="color:var(--muted);font-size:0.78rem;margin-bottom:8px">Use this URL as the chibi reference when testing Gemini image generation:</div>
+          <div style="font-family:monospace;font-size:0.8rem;background:var(--surface);padding:8px 12px;border-radius:6px;color:var(--blue)">http://localhost:8080/docs/test-chibi.png</div>
+          <button onclick="document.getElementById('up-chibi').value='http://localhost:8080/docs/test-chibi.png';show('user-profile')"
+                  style="margin-top:8px;background:var(--accent);color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:700">
+            → Set as Chibi URL
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GET /api/v1/cards ──────────────────────────── -->
+  <div id="panel-cards-list" class="panel">
+    <div class="panel-header">
+      <h1>List All Cards</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-get">GET</span>
+        <span class="endpoint-path">/api/v1/cards</span>
+      </div>
+    </div>
+    <p class="hint">Returns all destiny cards for the current user in spread order.</p>
+    <button class="send-btn" onclick="sendRequest('cards-list')">Send Request</button>
+    <div class="response-box" id="res-cards-list" style="display:none"></div>
+  </div>
+
+  <!-- ── GET /api/v1/cards/aspects ─────────────────── -->
+  <div id="panel-cards-aspects" class="panel">
+    <div class="panel-header">
+      <h1>Available Aspects</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-get">GET</span>
+        <span class="endpoint-path">/api/v1/cards/aspects</span>
+      </div>
+    </div>
+    <p class="hint">All 10 built-in aspects with <code>alreadyAdded: true/false</code> for the current user.</p>
+    <button class="send-btn" onclick="sendRequest('cards-aspects')">Send Request</button>
+    <div class="response-box" id="res-cards-aspects" style="display:none"></div>
+  </div>
+
+  <!-- ── GET /api/v1/cards/{id} ────────────────────── -->
+  <div id="panel-cards-detail" class="panel">
+    <div class="panel-header">
+      <h1>Card Detail</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-get">GET</span>
+        <span class="endpoint-path">/api/v1/cards/{cardId}</span>
+      </div>
+    </div>
+    <div class="form-grid single">
+      <div class="field">
+        <label>CARD ID</label>
+        <input id="detail-cardId" placeholder="UUID of the card" value="850ddd03-39c1-482a-a6a6-eabcc1518084" />
+      </div>
+    </div>
+    <button class="send-btn" onclick="sendRequest('cards-detail')">Send Request</button>
+    <div class="response-box" id="res-cards-detail" style="display:none"></div>
+  </div>
+
+  <!-- ── POST /api/v1/cards ────────────────────────── -->
+  <div id="panel-cards-add" class="panel">
+    <div class="panel-header">
+      <h1>Add Aspect Card</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-post">POST</span>
+        <span class="endpoint-path">/api/v1/cards</span>
+      </div>
+    </div>
+    <p class="hint">Add a new destiny card. Use a built-in <code>aspectKey</code> (e.g. "learning", "creativity") or set <code>isCustom: true</code> for a custom aspect.</p>
+    <div class="form-grid">
+      <div class="field">
+        <label>ASPECT KEY</label>
+        <select id="add-aspectKey">
+          <option value="learning">learning</option>
+          <option value="creativity">creativity</option>
+          <option value="spirituality">spirituality</option>
+          <option value="lifestyle">lifestyle</option>
+          <option value="legacy">legacy</option>
+          <option value="custom">custom (fill label below)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>IS CUSTOM</label>
+        <select id="add-isCustom">
+          <option value="false">false</option>
+          <option value="true">true</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>ASPECT LABEL (custom only)</label>
+        <input id="add-aspectLabel" placeholder="My Custom Aspect" />
+      </div>
+      <div class="field">
+        <label>ICON (custom only, emoji)</label>
+        <input id="add-icon" placeholder="🌟" />
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label>FEAR TEXT (required)</label>
+      <textarea id="add-fearText" placeholder="What is your biggest fear around this life area?">I'm afraid I'll never find my purpose and keep drifting from job to job without meaning.</textarea>
+    </div>
+    <button class="send-btn" onclick="sendRequest('cards-add')">Send Request</button>
+    <div class="response-box" id="res-cards-add" style="display:none"></div>
+  </div>
+
+  <!-- ── PATCH /api/v1/cards/{id} ──────────────────── -->
+  <div id="panel-cards-edit" class="panel">
+    <div class="panel-header">
+      <h1>Edit Card</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-patch">PATCH</span>
+        <span class="endpoint-path">/api/v1/cards/{cardId}</span>
+      </div>
+    </div>
+    <p class="hint">Update card fields. Only non-null fields are changed. <code>aspectLabel</code> / <code>icon</code> only allowed for custom aspects.</p>
+    <div class="form-grid single">
+      <div class="field">
+        <label>CARD ID</label>
+        <input id="edit-cardId" value="850ddd03-39c1-482a-a6a6-eabcc1518084" />
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label>FEAR ORIGINAL (optional)</label>
+        <textarea id="edit-fearOriginal" placeholder="Leave blank to keep existing"></textarea>
+      </div>
+      <div class="field">
+        <label>DREAM ORIGINAL (optional)</label>
+        <textarea id="edit-dreamOriginal" placeholder="Leave blank to keep existing"></textarea>
+      </div>
+      <div class="field">
+        <label>ASPECT LABEL (custom only)</label>
+        <input id="edit-aspectLabel" placeholder="Leave blank to keep existing" />
+      </div>
+      <div class="field">
+        <label>ICON (custom only)</label>
+        <input id="edit-icon" placeholder="Leave blank to keep existing" />
+      </div>
+    </div>
+    <button class="send-btn" onclick="sendRequest('cards-edit')">Send Request</button>
+    <div class="response-box" id="res-cards-edit" style="display:none"></div>
+  </div>
+
+  <!-- ── DELETE /api/v1/cards/{id} ─────────────────── -->
+  <div id="panel-cards-delete" class="panel">
+    <div class="panel-header">
+      <h1>Remove Card</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-delete">DELETE</span>
+        <span class="endpoint-path">/api/v1/cards/{cardId}</span>
+      </div>
+    </div>
+    <p class="hint">⚠️ Permanently deletes the card and all its habits. Stage content and image history are preserved (DB cascade).</p>
+    <div class="form-grid single">
+      <div class="field">
+        <label>CARD ID</label>
+        <input id="delete-cardId" placeholder="UUID of the card to delete" />
+      </div>
+    </div>
+    <button class="send-btn" style="background:var(--danger)" onclick="sendRequest('cards-delete')">Delete Card</button>
+    <div class="response-box" id="res-cards-delete" style="display:none"></div>
+  </div>
+
+  <!-- ── PUT /api/v1/cards/{id}/habits/{hid}/complete ─ -->
+  <div id="panel-habit-toggle" class="panel">
+    <div class="panel-header">
+      <h1>Toggle Habit Completion</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-put">PUT</span>
+        <span class="endpoint-path">/api/v1/cards/{cardId}/habits/{habitId}/complete</span>
+      </div>
+    </div>
+    <p class="hint">Mark a habit as done or undone for today. Idempotent — toggling the same value twice has no effect.</p>
+    <div class="form-grid">
+      <div class="field">
+        <label>CARD ID</label>
+        <input id="habit-cardId" value="850ddd03-39c1-482a-a6a6-eabcc1518084" />
+      </div>
+      <div class="field">
+        <label>HABIT ID</label>
+        <input id="habit-habitId" placeholder="UUID of habit (get from card detail)" />
+      </div>
+    </div>
+    <div class="form-grid single">
+      <div class="field">
+        <label>COMPLETED</label>
+        <select id="habit-completed">
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+      </div>
+    </div>
+    <button class="send-btn" onclick="sendRequest('habit-toggle')">Send Request</button>
+    <div class="response-box" id="res-habit-toggle" style="display:none"></div>
+  </div>
+
+  <!-- ── POST generate-prompts ─────────────────────── -->
+  <div id="panel-img-prompts" class="panel">
+    <div class="panel-header">
+      <h1>Generate Image Prompts (Claude)</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-post">POST</span>
+        <span class="endpoint-path">/api/v1/cards/{cardId}/generate-prompts</span>
+      </div>
+    </div>
+    <p class="hint">Calls Claude AI to generate 6 stage-specific image prompts. Requires <code>ANTHROPIC_API_KEY</code> env var. Returns prompts without generating images.</p>
+    <div class="form-grid single">
+      <div class="field">
+        <label>CARD ID</label>
+        <input id="prompt-cardId" value="850ddd03-39c1-482a-a6a6-eabcc1518084" />
+      </div>
+    </div>
+    <button class="send-btn" onclick="sendRequest('img-prompts')">Generate Prompts</button>
+    <div class="response-box" id="res-img-prompts" style="display:none"></div>
+  </div>
+
+  <!-- ── POST generate-images ──────────────────────── -->
+  <div id="panel-img-all" class="panel">
+    <div class="panel-header">
+      <h1>Generate All Stage Images (Gemini)</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-post">POST</span>
+        <span class="endpoint-path">/api/v1/cards/{cardId}/generate-images</span>
+      </div>
+    </div>
+    <p class="hint">Full pipeline: Claude generates 6 prompts → Gemini Imagen generates 6 images in parallel (virtual threads) → stores in GCS → persists URLs in DB.<br><br>Requires <code>ANTHROPIC_API_KEY</code> + <code>GOOGLE_CLOUD_PROJECT_ID</code>. May take ~60s.</p>
+    <div class="form-grid single">
+      <div class="field">
+        <label>CARD ID</label>
+        <input id="imgall-cardId" value="850ddd03-39c1-482a-a6a6-eabcc1518084" />
+      </div>
+    </div>
+    <button class="send-btn" onclick="sendRequest('img-all')">Generate All Images</button>
+    <div class="response-box" id="res-img-all" style="display:none"></div>
+  </div>
+
+  <!-- ── POST generate-images/{stage} ──────────────── -->
+  <div id="panel-img-stage" class="panel">
+    <div class="panel-header">
+      <h1>Regenerate Single Stage Image</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-post">POST</span>
+        <span class="endpoint-path">/api/v1/cards/{cardId}/generate-images/{stage}</span>
+      </div>
+    </div>
+    <p class="hint">Regenerates one specific stage's image. Useful for re-rolling a result you don't like.</p>
+    <div class="form-grid">
+      <div class="field">
+        <label>CARD ID</label>
+        <input id="imgstage-cardId" value="850ddd03-39c1-482a-a6a6-eabcc1518084" />
+      </div>
+      <div class="field">
+        <label>STAGE</label>
+        <select id="imgstage-stage">
+          <option>storm</option>
+          <option>fog</option>
+          <option>clearing</option>
+          <option>aura</option>
+          <option>radiance</option>
+          <option>legend</option>
+        </select>
+      </div>
+    </div>
+    <button class="send-btn" onclick="sendRequest('img-stage')">Regenerate Stage</button>
+    <div class="response-box" id="res-img-stage" style="display:none"></div>
+  </div>
+
+  <!-- ── POST generate-images/all ─────────────────────── -->
+  <div id="panel-img-all-aspects" class="panel">
+    <div class="panel-header">
+      <h1>Generate Images for All Aspects</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-post">POST</span>
+        <span class="endpoint-path">/api/v1/cards/generate-images/all</span>
+      </div>
+    </div>
+    <p class="hint">
+      <strong>One button to generate card art for every aspect.</strong><br><br>
+      For each of the user's aspect cards (Health, Career, Finances…):<br>
+      1. Claude writes 6 stage prompts (Storm → Legend)<br>
+      2. Gemini Imagen generates 6 stage images <em>in parallel</em><br>
+      3. Images stored in GCS, DB updated<br><br>
+      Aspects are processed one at a time (sequential) to avoid API rate limits.
+      Each aspect gets its own GenerationJob — poll <code>/{cardId}/jobs/latest</code> per aspect.
+    </p>
+    <p class="hint" style="color:var(--orange)">
+      ⚠️ Requires <code>ANTHROPIC_API_KEY</code> + <code>GOOGLE_CLOUD_PROJECT_ID</code>.
+      May take several minutes for all aspects.
+    </p>
+    <button class="send-btn" onclick="sendRequest('img-all-aspects')">Generate All Aspects</button>
+    <div class="response-box" id="res-img-all-aspects" style="display:none"></div>
+  </div>
+
+  <!-- ── Job Tracker ───────────────────────────────── -->
+  <div id="panel-job-tracker" class="panel">
+    <div class="panel-header">
+      <h1>Generation Job Tracker</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-get">GET</span>
+        <span class="endpoint-path">/api/v1/cards/{cardId}/jobs/latest</span>
+      </div>
+    </div>
+    <p class="hint">
+      Poll the pipeline status after calling <strong>Generate All Images</strong>.
+      Shows all 12 steps (6 PROMPT + 6 IMAGE) with real-time status.<br><br>
+      <strong>Job statuses:</strong> QUEUED → PROMPTING → IMAGING → COMPLETED | FAILED<br>
+      <strong>Step statuses:</strong> WAITING → RUNNING → DONE | FAILED | SKIPPED
+    </p>
+
+    <div class="form-grid single">
+      <div class="field">
+        <label>CARD ID</label>
+        <input id="job-cardId" value="850ddd03-39c1-482a-a6a6-eabcc1518084" />
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="send-btn" onclick="sendRequest('job-latest')" style="flex:1;min-width:160px">Get Latest Job</button>
+      <button class="send-btn" onclick="startPolling()" id="poll-btn" style="flex:1;min-width:160px;background:var(--accent)">▶ Start Auto-Poll (3s)</button>
+      <button class="send-btn" onclick="stopPolling()" style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border)">⏹ Stop</button>
+    </div>
+
+    <!-- Live pipeline visualizer -->
+    <div id="job-pipeline" style="display:none;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <span id="job-status-badge" style="padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;background:var(--surface2);color:var(--muted)">QUEUED</span>
+          <span id="job-label" style="color:var(--muted);font-size:0.8rem;margin-left:10px"></span>
+        </div>
+        <span id="job-progress-text" style="color:var(--gold);font-size:0.8rem;font-weight:700"></span>
+      </div>
+      <div id="job-progress-bar-wrap" style="background:var(--surface2);border-radius:4px;height:6px;margin-bottom:14px">
+        <div id="job-progress-bar" style="height:6px;border-radius:4px;background:var(--accent);width:0%;transition:width 0.4s"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="job-steps-grid"></div>
+    </div>
+
+    <div class="response-box" id="res-job-latest" style="display:none"></div>
+  </div>
+
+  <!-- ── Job History ─────────────────────────────── -->
+  <div id="panel-job-history" class="panel">
+    <div class="panel-header">
+      <h1>Job History</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-get">GET</span>
+        <span class="endpoint-path">/api/v1/cards/{cardId}/jobs</span>
+      </div>
+    </div>
+    <p class="hint">All GenerationJobs for a card, newest first.</p>
+    <div class="form-grid single">
+      <div class="field">
+        <label>CARD ID</label>
+        <input id="hist-cardId" value="850ddd03-39c1-482a-a6a6-eabcc1518084" />
+      </div>
+    </div>
+    <button class="send-btn" onclick="sendRequest('job-history')">List All Jobs</button>
+    <div class="response-box" id="res-job-history" style="display:none"></div>
+  </div>
+
+  <!-- ── Health ─────────────────────────────────────── -->
+  <div id="panel-health" class="panel">
+    <div class="panel-header">
+      <h1>Health Check</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-get">GET</span>
+        <span class="endpoint-path">/actuator/health</span>
+      </div>
+    </div>
+    <p class="hint">Checks DB connection status and disk space via Spring Actuator.</p>
+    <button class="send-btn" onclick="sendRequest('health')">Check Health</button>
+    <div class="response-box" id="res-health" style="display:none"></div>
+  </div>
+
+  <!-- ── User Profile ──────────────────────────────── -->
+  <div id="panel-user-profile" class="panel">
+    <div class="panel-header">
+      <h1>Set User Profile — Chibi &amp; Avatar</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-put">PUT</span>
+        <span class="endpoint-path">/api/v1/users/{userId}</span>
+      </div>
+    </div>
+    <p class="hint">
+      Set the <code>chibi_url</code> and <code>avatar_url</code> for the current user.<br>
+      <strong>chibi_url</strong> is used as a <em>style reference image</em> when Gemini Imagen generates card art — it gives the AI a visual anchor for the character's look.<br>
+      Paste any public image URL (e.g. from Google Drive, Imgur, or your GCS bucket).
+    </p>
+
+    <div class="form-grid">
+      <div class="field">
+        <label>DISPLAY NAME</label>
+        <input id="up-name" placeholder="e.g. Adam" />
+      </div>
+      <div class="field">
+        <label>AVATAR URL</label>
+        <input id="up-avatar" placeholder="https://..." />
+      </div>
+    </div>
+    <div class="form-grid single">
+      <div class="field">
+        <label>CHIBI URL — style reference for image generation</label>
+        <input id="up-chibi" placeholder="https://... (public image URL of your chibi character)" />
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div id="up-preview" style="display:none;margin-bottom:16px;display:flex;gap:16px;align-items:flex-start">
+      <div>
+        <div style="color:var(--muted);font-size:0.75rem;margin-bottom:4px">AVATAR PREVIEW</div>
+        <img id="up-avatar-img" src="" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--border)" onerror="this.style.display='none'" />
+      </div>
+      <div>
+        <div style="color:var(--muted);font-size:0.75rem;margin-bottom:4px">CHIBI PREVIEW</div>
+        <img id="up-chibi-img" src="" style="width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid var(--gold)" onerror="this.style.display='none'" />
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="send-btn" onclick="previewImages()">👁 Preview Images</button>
+      <button class="send-btn" onclick="sendRequest('user-profile')">Save to User Profile</button>
+    </div>
+    <div class="response-box" id="res-user-profile" style="display:none"></div>
+  </div>
+
+  <!-- ── Pipeline Test Lab ──────────────────────────── -->
+  <div id="panel-pipeline-lab" class="panel">
+    <div class="panel-header">
+      <h1>🧪 Pipeline Test Lab</h1>
+      <div class="endpoint-line">
+        <span class="method-badge method-post">POST</span>
+        <span class="endpoint-path">Step-by-step or End-to-End</span>
+      </div>
+    </div>
+    <p class="hint">
+      Test the full AI pipeline one step at a time, or fire end-to-end.<br>
+      <strong>Step 1</strong> — Claude writes title/tagline/lore for each stage from fear+dream<br>
+      <strong>Step 2</strong> — Claude writes 6 Imagen-ready image prompts<br>
+      <strong>Step 3</strong> — Gemini generates 6 images, stored in GCS
+    </p>
+
+    <!-- Inputs -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
+      <div style="color:var(--gold);font-weight:700;font-size:0.85rem;margin-bottom:12px">① Configure Card</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>ASPECT KEY</label>
+          <select id="lab-aspect">
+            <option value="health">health</option>
+            <option value="career">career</option>
+            <option value="finances">finances</option>
+            <option value="relationships">relationships</option>
+            <option value="family">family</option>
+            <option value="learning">learning</option>
+            <option value="creativity">creativity</option>
+            <option value="spirituality">spirituality</option>
+            <option value="lifestyle">lifestyle</option>
+            <option value="legacy">legacy</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>OR USE EXISTING CARD ID</label>
+          <input id="lab-cardId" placeholder="Leave blank to create new card" />
+        </div>
+      </div>
+      <div class="form-grid single">
+        <div class="field">
+          <label>FEAR TEXT — user's darkest fear for this aspect</label>
+          <textarea id="lab-fear" placeholder="e.g. I'm afraid I'll never be healthy and will die early from neglecting my body...">I'm afraid I'll never be healthy and will spend my life feeling tired, overweight, and unable to keep up with the people I love.</textarea>
+        </div>
+      </div>
+      <div class="form-grid single">
+        <div class="field">
+          <label>DREAM TEXT — user's greatest aspiration</label>
+          <textarea id="lab-dream" placeholder="e.g. I want to run a marathon, feel strong every day...">I want to wake up every morning full of energy, run a marathon, and feel proud of how I treat my body.</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step-by-step buttons -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
+      <div style="color:var(--gold);font-weight:700;font-size:0.85rem;margin-bottom:12px">② Run Steps Individually</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="send-btn" style="min-width:200px" onclick="labStep('create-card')">1a. Create Card</button>
+          <span style="color:var(--muted);font-size:0.78rem">POST /api/v1/cards — creates card with your fear+dream (also auto-triggers Step 1)</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="send-btn" style="min-width:200px;background:var(--surface);border:1px solid var(--border)" onclick="labStep('gen-stage-content')">1b. Step 1 — Stage Content</button>
+          <span style="color:var(--muted);font-size:0.78rem">POST /{cardId}/generate-stage-content — Claude writes title/tagline/lore × 6 stages</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="send-btn" style="min-width:200px;background:var(--surface);border:1px solid var(--border)" onclick="labStep('gen-prompts')">2. Step 2 — Image Prompts</button>
+          <span style="color:var(--muted);font-size:0.78rem">POST /{cardId}/generate-prompts — Claude writes 6 Imagen prompts</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="send-btn" style="min-width:200px;background:var(--surface);border:1px solid var(--border)" onclick="labStep('gen-images')">3. Step 3 — Generate Images</button>
+          <span style="color:var(--muted);font-size:0.78rem">POST /{cardId}/generate-images — Gemini generates 6 images in parallel</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="send-btn" style="min-width:200px;background:var(--surface);border:1px solid var(--border)" onclick="labStep('get-card')">View Card State</button>
+          <span style="color:var(--muted);font-size:0.78rem">GET /{cardId} — see current stage content + image URLs</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- End-to-end -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
+      <div style="color:var(--gold);font-weight:700;font-size:0.85rem;margin-bottom:12px">③ End-to-End (all steps at once)</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="send-btn" style="background:linear-gradient(135deg,var(--accent),var(--gold));color:#07090f;font-weight:900" onclick="labRunEndToEnd()">
+          🚀 Create Card + Run Full Pipeline
+        </button>
+        <span style="color:var(--muted);font-size:0.78rem">Creates card → Step 1 → Step 2 → Step 3 → shows images</span>
+      </div>
+    </div>
+
+    <!-- Active card ID display -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span style="color:var(--muted);font-size:0.78rem">Active Card ID:</span>
+      <code id="lab-active-card" style="color:var(--green);font-size:0.78rem">none</code>
+      <button onclick="navigator.clipboard.writeText(document.getElementById('lab-active-card').textContent)" style="background:none;border:1px solid var(--border);color:var(--muted);padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem">copy</button>
+    </div>
+
+    <!-- Job progress -->
+    <div id="lab-job-panel" style="display:none;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span id="lab-job-status" style="padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;background:var(--surface2);color:var(--muted)">QUEUED</span>
+        <span id="lab-job-progress" style="color:var(--gold);font-size:0.8rem;font-weight:700"></span>
+      </div>
+      <div style="background:var(--surface2);border-radius:4px;height:6px;margin-bottom:10px">
+        <div id="lab-progress-bar" style="height:6px;border-radius:4px;background:var(--accent);width:0%;transition:width 0.4s"></div>
+      </div>
+      <div id="lab-steps-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:0.75rem"></div>
+    </div>
+
+    <!-- Generated images display -->
+    <div id="lab-images-grid" style="display:none">
+      <div style="color:var(--gold);font-weight:700;font-size:0.85rem;margin-bottom:10px">Generated Card Images</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px" id="lab-img-cards"></div>
+    </div>
+
+    <!-- Stage content display -->
+    <div id="lab-stage-content" style="display:none;margin-top:16px">
+      <div style="color:var(--gold);font-weight:700;font-size:0.85rem;margin-bottom:10px">Stage Content (Step 1 Output)</div>
+      <div id="lab-stage-cards" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
+    </div>
+
+    <div class="response-box" id="res-pipeline-lab" style="display:none"></div>
+  </div>
+
+  <!-- ── Swagger redirect ───────────────────────────── -->
+  <div id="panel-swagger" class="panel">
+    <div class="panel-header"><h1>Swagger UI</h1></div>
+    <p class="hint">Opens the full Swagger UI in a new tab.</p>
+    <button class="send-btn" onclick="window.open(document.getElementById('baseUrl').value + '/swagger-ui.html', '_blank')">Open Swagger UI ↗</button>
+  </div>
+
+</main>
+
+<script>
+  // ── Navigation ────────────────────────────────────────
+  function show(id) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+
+  // ── HTTP helpers ──────────────────────────────────────
+  function base() { return document.getElementById('baseUrl').value.replace(/\/$/, ''); }
+  function uid()  { return document.getElementById('userId').value; }
+  function headers(hasBody) {
+    const h = { 'X-User-Id': uid() };
+    if (hasBody) h['Content-Type'] = 'application/json';
+    return h;
+  }
+
+  function showResponse(id, status, body, elapsed) {
+    const box = document.getElementById('res-' + id);
+    box.style.display = 'block';
+    const ok = status >= 200 && status < 300;
+    box.innerHTML = `
+      <div class="response-header">
+        <span class="status ${ok ? 'status-ok' : 'status-err'}">${status}</span>
+        <span>${ok ? '✓ Success' : '✗ Error'}</span>
+        <span class="elapsed">${elapsed}ms</span>
+      </div>
+      <div class="response-body ${ok ? 'success' : 'error'}">${escapeHtml(JSON.stringify(body, null, 2))}</div>
+    `;
+  }
+
+  function showLoading(id) {
+    const box = document.getElementById('res-' + id);
+    box.style.display = 'block';
+    box.innerHTML = `<div class="response-header"><span class="status" style="color:var(--muted)">···</span><span style="color:var(--muted)">Waiting for response…</span></div><div class="response-body" style="color:var(--muted)">Sending request...</div>`;
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  async function req(id, method, url, body) {
+    showLoading(id);
+    const t0 = Date.now();
+    try {
+      const opts = { method, headers: headers(!!body) };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(url, opts);
+      const json = await res.json().catch(() => ({}));
+      showResponse(id, res.status, json, Date.now() - t0);
+    } catch(e) {
+      showResponse(id, 0, { error: e.message }, Date.now() - t0);
+    }
+  }
+
+  // ── Dispatch ──────────────────────────────────────────
+  function sendRequest(id) {
+    const b = base();
+    switch(id) {
+      case 'cards-list':
+        return req(id, 'GET', `${b}/api/v1/cards`);
+
+      case 'cards-aspects':
+        return req(id, 'GET', `${b}/api/v1/cards/aspects`);
+
+      case 'cards-detail': {
+        const cid = document.getElementById('detail-cardId').value.trim();
+        return req(id, 'GET', `${b}/api/v1/cards/${cid}`);
+      }
+
+      case 'cards-add': {
+        const key = document.getElementById('add-aspectKey').value;
+        const body = {
+          aspectKey: key === 'custom' ? 'custom_' + Date.now() : key,
+          fearText:  document.getElementById('add-fearText').value.trim(),
+          isCustom:  document.getElementById('add-isCustom').value === 'true',
+        };
+        const label = document.getElementById('add-aspectLabel').value.trim();
+        const icon  = document.getElementById('add-icon').value.trim();
+        if (label) body.aspectLabel = label;
+        if (icon)  body.icon = icon;
+        return req(id, 'POST', `${b}/api/v1/cards`, body);
+      }
+
+      case 'cards-edit': {
+        const cid = document.getElementById('edit-cardId').value.trim();
+        const body = {};
+        const fear  = document.getElementById('edit-fearOriginal').value.trim();
+        const dream = document.getElementById('edit-dreamOriginal').value.trim();
+        const label = document.getElementById('edit-aspectLabel').value.trim();
+        const icon  = document.getElementById('edit-icon').value.trim();
+        if (fear)  body.fearOriginal  = fear;
+        if (dream) body.dreamOriginal = dream;
+        if (label) body.aspectLabel   = label;
+        if (icon)  body.icon          = icon;
+        return req(id, 'PATCH', `${b}/api/v1/cards/${cid}`, body);
+      }
+
+      case 'cards-delete': {
+        const cid = document.getElementById('delete-cardId').value.trim();
+        return req(id, 'DELETE', `${b}/api/v1/cards/${cid}`);
+      }
+
+      case 'habit-toggle': {
+        const cid = document.getElementById('habit-cardId').value.trim();
+        const hid = document.getElementById('habit-habitId').value.trim();
+        const done = document.getElementById('habit-completed').value === 'true';
+        return req(id, 'PUT', `${b}/api/v1/cards/${cid}/habits/${hid}/complete?completed=${done}`);
+      }
+
+      case 'img-prompts': {
+        const cid = document.getElementById('prompt-cardId').value.trim();
+        return req(id, 'POST', `${b}/api/v1/cards/${cid}/generate-prompts`);
+      }
+
+      case 'img-all': {
+        const cid = document.getElementById('imgall-cardId').value.trim();
+        return req(id, 'POST', `${b}/api/v1/cards/${cid}/generate-images`);
+      }
+
+      case 'img-stage': {
+        const cid   = document.getElementById('imgstage-cardId').value.trim();
+        const stage = document.getElementById('imgstage-stage').value;
+        return req(id, 'POST', `${b}/api/v1/cards/${cid}/generate-images/${stage}`);
+      }
+
+      case 'img-all-aspects':
+        return req(id, 'POST', `${b}/api/v1/cards/generate-images/all`);
+
+      case 'job-latest': {
+        const cid = document.getElementById('job-cardId').value.trim();
+        return reqWithCallback('job-latest', 'GET', `${b}/api/v1/cards/${cid}/jobs/latest`, null, renderJobPipeline);
+      }
+
+      case 'job-history': {
+        const cid = document.getElementById('hist-cardId').value.trim();
+        return req(id, 'GET', `${b}/api/v1/cards/${cid}/jobs`);
+      }
+
+      case 'health':
+        return req(id, 'GET', `${b}/actuator/health`);
+
+      case 'user-profile': {
+        const uid  = document.getElementById('userId').value.trim();
+        const body = {};
+        const name  = document.getElementById('up-name').value.trim();
+        const avatar= document.getElementById('up-avatar').value.trim();
+        const chibi = document.getElementById('up-chibi').value.trim();
+        if (name)   body.displayName = name;
+        if (avatar) body.avatarUrl   = avatar;
+        if (chibi)  body.chibiUrl    = chibi;
+        return req(id, 'PUT', `${b}/api/v1/users/${uid}`, body);
+      }
+    }
+  }
+
+  // ── Server status check ───────────────────────────────
+  async function checkServerStatus() {
+    const b = document.getElementById('baseUrl').value.trim();
+    const row = document.getElementById('server-status-row');
+    row.innerHTML = '<span style="color:var(--muted)">Checking…</span>';
+    try {
+      const t0  = Date.now();
+      const res = await fetch(`${b}/actuator/health`);
+      const ms  = Date.now() - t0;
+      const json= await res.json();
+      const db  = json.components?.db?.status || 'UNKNOWN';
+      const disk= json.components?.diskSpace?.status || 'UNKNOWN';
+      row.innerHTML = `
+        <span style="color:var(--green)">🟢 Server UP</span>
+        <span style="color:var(--muted)">·</span>
+        <span style="color:var(--text)">DB: <span style="color:${db==='UP'?'var(--green)':'var(--danger)'}">${db}</span></span>
+        <span style="color:var(--muted)">·</span>
+        <span style="color:var(--text)">Disk: <span style="color:${disk==='UP'?'var(--green)':'var(--orange)'}">${disk}</span></span>
+        <span style="color:var(--muted)">·</span>
+        <span style="color:var(--muted)">${ms}ms</span>`;
+      // Check anthropic key via a quick card list call
+      fetch(`${b}/api/v1/cards`, { headers: {'X-User-Id': document.getElementById('userId').value.trim()} })
+        .then(r => {
+          document.getElementById('anthropic-status').textContent =
+            r.ok ? '✓ API reachable — key will be tested on first Claude call' : '✗ Cards API error';
+          document.getElementById('anthropic-status').style.color = r.ok ? 'var(--green)' : 'var(--danger)';
+        });
+    } catch(e) {
+      row.innerHTML = `<span style="color:var(--danger)">🔴 Server DOWN — ${e.message}</span>
+        <span style="color:var(--muted);margin-left:12px">Start with: JAVA_HOME=... mvn spring-boot:run</span>`;
+    }
+  }
+  // Auto-check on load
+  window.addEventListener('load', () => setTimeout(checkServerStatus, 600));
+
+  // ── Preview chibi/avatar images ───────────────────────
+  function previewImages() {
+    const avatar = document.getElementById('up-avatar').value.trim();
+    const chibi  = document.getElementById('up-chibi').value.trim();
+    if (avatar) { document.getElementById('up-avatar-img').src = avatar; document.getElementById('up-avatar-img').style.display = 'block'; }
+    if (chibi)  { document.getElementById('up-chibi-img').src  = chibi;  document.getElementById('up-chibi-img').style.display  = 'block'; }
+    document.getElementById('up-preview').style.display = 'flex';
+  }
+
+  // ── Pipeline Lab ──────────────────────────────────────
+  let labCardId   = null;
+  let labPollTimer = null;
+
+  function labLog(msg, color) {
+    const box = document.getElementById('res-pipeline-lab');
+    box.style.display = 'block';
+    box.className = 'response-box';
+    const line = document.createElement('div');
+    line.style.cssText = `color:${color||'var(--text)'};font-family:monospace;font-size:0.8rem;padding:2px 0;`;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    box.prepend(line);
+  }
+
+  function labSetCard(id) {
+    labCardId = id;
+    document.getElementById('lab-active-card').textContent = id;
+    // sync card ID into other panels
+    document.getElementById('job-cardId').value    = id;
+    document.getElementById('imgall-cardId').value = id;
+    document.getElementById('hist-cardId').value   = id;
+    document.getElementById('prompt-cardId').value = id;
+  }
+
+  async function labStep(step) {
+    const b    = document.getElementById('baseUrl').value.trim();
+    const uid  = document.getElementById('userId').value.trim();
+    const h    = { 'Content-Type': 'application/json', 'X-User-Id': uid };
+    const fear = document.getElementById('lab-fear').value.trim();
+    const dream= document.getElementById('lab-dream').value.trim();
+    const asp  = document.getElementById('lab-aspect').value;
+    const existingId = document.getElementById('lab-cardId').value.trim();
+    if (existingId) labSetCard(existingId);
+
+    try {
+      if (step === 'create-card') {
+        labLog('Creating card…', 'var(--blue)');
+        const res  = await fetch(`${b}/api/v1/cards`, { method:'POST', headers:h,
+          body: JSON.stringify({ aspectKey: asp, fearText: fear, dreamText: dream }) });
+        const json = await res.json();
+        const id   = json.data?.id;
+        if (!id) { labLog('Failed: ' + JSON.stringify(json), 'var(--danger)'); return; }
+        labSetCard(id);
+        labLog(`Card created: ${id}`, 'var(--green)');
+        labLog('Step 1 (stage content) auto-triggered on card creation', 'var(--muted)');
+        labShowStageContent(json.data);
+        return;
+      }
+
+      if (!labCardId) { labLog('No active card. Run "Create Card" first.', 'var(--orange)'); return; }
+
+      if (step === 'gen-stage-content') {
+        labLog('Step 1 — Generating stage content (Claude)…', 'var(--blue)');
+        const res  = await fetch(`${b}/api/v1/cards/${labCardId}/generate-stage-content`, { method:'POST', headers:h });
+        const json = await res.json();
+        labLog(res.ok ? 'Step 1 done ✓' : 'Step 1 failed ✗', res.ok ? 'var(--green)' : 'var(--danger)');
+        if (json.data?.stageContent) labShowStageContent(json.data);
+        return;
+      }
+
+      if (step === 'gen-prompts') {
+        labLog('Step 2 — Generating image prompts (Claude)…', 'var(--blue)');
+        const res  = await fetch(`${b}/api/v1/cards/${labCardId}/generate-prompts`, { method:'POST', headers:h });
+        const json = await res.json();
+        labLog(res.ok ? 'Step 2 done ✓ — prompts written' : 'Step 2 failed ✗', res.ok ? 'var(--green)' : 'var(--danger)');
+        if (json.data) labLog(JSON.stringify(json.data).substring(0,200), 'var(--muted)');
+        return;
+      }
+
+      if (step === 'gen-images') {
+        labLog('Step 3 — Generating images (Gemini Imagen)…', 'var(--accent)');
+        const res  = await fetch(`${b}/api/v1/cards/${labCardId}/generate-images`, { method:'POST', headers:h });
+        const json = await res.json();
+        labLog(res.ok ? 'Step 3 started ✓ — polling job…' : 'Step 3 failed ✗', res.ok ? 'var(--green)' : 'var(--danger)');
+        if (res.ok) labStartPoll();
+        return;
+      }
+
+      if (step === 'get-card') {
+        labLog('Fetching card state…', 'var(--blue)');
+        const res  = await fetch(`${b}/api/v1/cards/${labCardId}`, { headers: {'X-User-Id': uid} });
+        const json = await res.json();
+        labLog('Card fetched ✓', 'var(--green)');
+        labShowImages(json.data);
+        labShowStageContent(json.data);
+      }
+
+    } catch(e) {
+      labLog('Error: ' + e.message, 'var(--danger)');
+    }
+  }
+
+  async function labRunEndToEnd() {
+    await labStep('create-card');
+    if (!labCardId) return;
+    await new Promise(r => setTimeout(r, 800));
+    await labStep('gen-prompts');
+    await new Promise(r => setTimeout(r, 500));
+    await labStep('gen-images');
+  }
+
+  function labStartPoll() {
+    if (labPollTimer) clearInterval(labPollTimer);
+    document.getElementById('lab-job-panel').style.display = 'block';
+    labPollTimer = setInterval(labPollJob, 3000);
+    labPollJob();
+  }
+
+  async function labPollJob() {
+    const b   = document.getElementById('baseUrl').value.trim();
+    const uid = document.getElementById('userId').value.trim();
+    if (!labCardId) return;
+    try {
+      const res  = await fetch(`${b}/api/v1/cards/${labCardId}/jobs/latest`, { headers:{'X-User-Id':uid} });
+      const json = await res.json();
+      const job  = json.data;
+      if (!job) return;
+
+      // Update progress UI
+      document.getElementById('lab-job-status').textContent   = job.status;
+      document.getElementById('lab-job-status').style.background = JOB_STATUS_COLOR[job.status] || 'var(--muted)';
+      document.getElementById('lab-job-status').style.color   = '#fff';
+      document.getElementById('lab-job-progress').textContent = `${job.completedSteps}/${job.totalSteps} (${job.progressPercent}%)`;
+      document.getElementById('lab-progress-bar').style.width = job.progressPercent + '%';
+
+      const grid = document.getElementById('lab-steps-grid');
+      grid.innerHTML = (job.steps || []).map(s => {
+        const color = STEP_STATUS_COLOR[s.status] || 'var(--muted)';
+        const icon  = STEP_STATUS_ICON[s.status]  || '?';
+        return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;
+                            padding:6px 10px;border-left:3px solid ${color};font-size:0.72rem">
+          <span style="color:var(--text)">${s.phase==='PROMPT'?'🧠':'🎨'} ${s.stage}</span>
+          <span style="color:${color};float:right">${icon} ${s.status}</span>
+        </div>`;
+      }).join('');
+
+      if (job.status === 'COMPLETED') {
+        clearInterval(labPollTimer); labPollTimer = null;
+        labLog('Pipeline COMPLETED ✓ — loading images…', 'var(--green)');
+        // fetch card to get image URLs
+        const cRes  = await fetch(`${b}/api/v1/cards/${labCardId}`, { headers:{'X-User-Id':uid} });
+        const cJson = await cRes.json();
+        labShowImages(cJson.data);
+      } else if (job.status === 'FAILED') {
+        clearInterval(labPollTimer); labPollTimer = null;
+        labLog('Pipeline FAILED ✗ — ' + (job.errorMessage || ''), 'var(--danger)');
+      }
+    } catch(e) { labLog('Poll error: ' + e.message, 'var(--danger)'); }
+  }
+
+  function labShowImages(card) {
+    if (!card) return;
+    const stages = ['storm','fog','clearing','aura','radiance','legend'];
+    const stageContent = card.stageContents || {};
+    const imgs = stages.map(s => {
+      const content = stageContent[s.toUpperCase()] || stageContent[s] || {};
+      const url = content.imageUrl || card.imageUrl || '';
+      return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <div style="padding:6px 10px;font-size:0.75rem;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.06em">${s}</div>
+        ${url
+          ? `<img src="${url}" style="width:100%;aspect-ratio:3/4;object-fit:cover" onerror="this.replaceWith(document.createTextNode('No image'))" />`
+          : `<div style="aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.75rem">No image yet</div>`
+        }
+      </div>`;
+    }).join('');
+    const grid = document.getElementById('lab-images-grid');
+    grid.style.display = 'block';
+    document.getElementById('lab-img-cards').innerHTML = imgs;
+  }
+
+  function labShowStageContent(card) {
+    if (!card || !card.stageContents) return;
+    const stages = ['STORM','FOG','CLEARING','AURA','RADIANCE','LEGEND'];
+    const stageColors = { STORM:'#4a5568',FOG:'#6b7280',CLEARING:'#7b6ef6',AURA:'#60a5fa',RADIANCE:'#f0c060',LEGEND:'#4ade80' };
+    const html = stages.map(s => {
+      const c = card.stageContents[s] || {};
+      const color = stageColors[s] || 'var(--muted)';
+      return `<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid ${color};border-radius:8px;padding:12px">
+        <div style="font-weight:700;font-size:0.8rem;color:${color};margin-bottom:4px">${s}</div>
+        <div style="font-weight:600;color:var(--text);font-size:0.82rem">${c.title || '—'}</div>
+        <div style="color:var(--muted);font-size:0.75rem;font-style:italic;margin:2px 0">${c.tagline || ''}</div>
+        <div style="color:var(--text);font-size:0.75rem;margin-top:4px;line-height:1.5">${(c.lore||'').substring(0,120)}${(c.lore||'').length>120?'…':''}</div>
+      </div>`;
+    }).join('');
+    const panel = document.getElementById('lab-stage-content');
+    panel.style.display = 'block';
+    document.getElementById('lab-stage-cards').innerHTML = html;
+  }
+
+  // ── Job pipeline visualizer ───────────────────────────
+
+  const STEP_STATUS_COLOR = {
+    WAITING: 'var(--muted)',
+    RUNNING: 'var(--blue)',
+    DONE:    'var(--green)',
+    FAILED:  'var(--danger)',
+    SKIPPED: 'var(--orange)',
+  };
+  const STEP_STATUS_ICON = {
+    WAITING: '○', RUNNING: '◌', DONE: '✓', FAILED: '✗', SKIPPED: '⤼',
+  };
+  const JOB_STATUS_COLOR = {
+    QUEUED:    'var(--muted)',
+    PROMPTING: 'var(--blue)',
+    IMAGING:   'var(--accent)',
+    COMPLETED: 'var(--green)',
+    FAILED:    'var(--danger)',
+  };
+
+  function renderJobPipeline(data) {
+    if (!data || !data.data) return;
+    const job = data.data;
+
+    const pipeline = document.getElementById('job-pipeline');
+    pipeline.style.display = 'block';
+
+    // Status badge
+    const badge = document.getElementById('job-status-badge');
+    badge.textContent = job.status;
+    badge.style.background = JOB_STATUS_COLOR[job.status] || 'var(--muted)';
+    badge.style.color = '#fff';
+
+    document.getElementById('job-label').textContent = job.jobLabel || '';
+    document.getElementById('job-progress-text').textContent =
+      `${job.completedSteps} / ${job.totalSteps} steps (${job.progressPercent}%)`;
+    document.getElementById('job-progress-bar').style.width = job.progressPercent + '%';
+
+    // Steps grid
+    const grid = document.getElementById('job-steps-grid');
+    grid.innerHTML = '';
+
+    const promptSteps = (job.steps || []).filter(s => s.phase === 'PROMPT');
+    const imageSteps  = (job.steps || []).filter(s => s.phase === 'IMAGE');
+
+    function makeStepCard(step) {
+      const color = STEP_STATUS_COLOR[step.status] || 'var(--muted)';
+      const icon  = STEP_STATUS_ICON[step.status]  || '?';
+      return `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;
+                    padding:10px 12px;border-left:3px solid ${color}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:0.78rem;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:0.04em">
+              ${step.phase === 'PROMPT' ? '🧠' : '🎨'} ${step.stage}
+            </span>
+            <span style="font-size:0.75rem;font-weight:700;color:${color}">${icon} ${step.status}</span>
+          </div>
+          <div style="font-size:0.72rem;color:var(--muted);line-height:1.4">${escapeHtml(step.message || '')}</div>
+          ${step.resultUrl ? `<div style="margin-top:6px;font-size:0.7rem;color:var(--blue);word-break:break-all">${escapeHtml(step.resultUrl)}</div>` : ''}
+        </div>`;
+    }
+
+    // Column headers
+    grid.innerHTML = `
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);letter-spacing:0.08em;
+                    text-transform:uppercase;margin-bottom:8px;padding-left:4px">
+          Phase 1 — Prompts (Claude)
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${promptSteps.map(makeStepCard).join('')}
+        </div>
+      </div>
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);letter-spacing:0.08em;
+                    text-transform:uppercase;margin-bottom:8px;padding-left:4px">
+          Phase 2 — Images (Gemini Imagen)
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${imageSteps.map(makeStepCard).join('')}
+        </div>
+      </div>
+    `;
+
+    // Auto-stop polling when terminal state reached
+    if (job.status === 'COMPLETED' || job.status === 'FAILED') {
+      stopPolling();
+    }
+  }
+
+  // ── Auto-polling ──────────────────────────────────────
+
+  let pollTimer = null;
+
+  function startPolling() {
+    if (pollTimer) return;
+    document.getElementById('poll-btn').textContent = '⏸ Polling… (3s)';
+    document.getElementById('poll-btn').style.opacity = '0.7';
+    pollTimer = setInterval(() => sendRequest('job-latest'), 3000);
+    sendRequest('job-latest'); // immediate first fetch
+  }
+
+  function stopPolling() {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    document.getElementById('poll-btn').textContent = '▶ Start Auto-Poll (3s)';
+    document.getElementById('poll-btn').style.opacity = '1';
+  }
+
+  // ── Extended req with callback ───────────────────────
+
+  async function reqWithCallback(id, method, url, body, callback) {
+    showLoading(id);
+    const t0 = Date.now();
+    try {
+      const opts = { method, headers: headers(!!body) };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(url, opts);
+      const json = await res.json().catch(() => ({}));
+      showResponse(id, res.status, json, Date.now() - t0);
+      if (callback) callback(json);
+    } catch(e) {
+      showResponse(id, 0, { error: e.message }, Date.now() - t0);
+    }
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Destiny Oracle — Database ER Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@9.4.3/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({startOnLoad:true,theme:'dark',securityLevel:'loose',flowchart:{htmlLabels:true,curve:'basis',useMaxWidth:false}});</script>
+  <style>
+    /* ── Reset & Base ──────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #07090f;
+      --surface:  #0e1117;
+      --surface2: #161b27;
+      --border:   #1e2535;
+      --gold:     #f0c060;
+      --accent:   #7b6ef6;
+      --text:     #c8d0e0;
+      --muted:    #5a6478;
+      --danger:   #f87171;
+      --green:    #4ade80;
+      --blue:     #60a5fa;
+      --orange:   #fb923c;
+
+      /* Stage colours */
+      --storm:    #4a5568;
+      --fog:      #6b7280;
+      --clearing: #7b6ef6;
+      --aura:     #60a5fa;
+      --radiance: #f0c060;
+      --legend:   #4ade80;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+      padding: 32px 24px 64px;
+    }
+
+    /* ── Header ────────────────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .header h1 {
+      font-family: 'Georgia', 'Cinzel', serif;
+      font-size: 2rem;
+      color: var(--gold);
+      letter-spacing: 0.06em;
+      text-shadow: 0 0 24px rgba(240,192,96,0.4);
+      margin-bottom: 6px;
+    }
+    .header p {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .badge-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      padding: 3px 12px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      border: 1px solid;
+    }
+    .badge-spring  { background: rgba(116,185,255,0.1); border-color: var(--blue);    color: var(--blue); }
+    .badge-pg      { background: rgba(96,165,250,0.1);  border-color: #6db3f2;        color: #6db3f2; }
+    .badge-java    { background: rgba(251,146,60,0.1);  border-color: var(--orange);  color: var(--orange); }
+    .badge-tables  { background: rgba(74,222,128,0.1);  border-color: var(--green);   color: var(--green); }
+
+    /* ── Section card ──────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 32px;
+      margin-bottom: 32px;
+    }
+    .card h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--gold);
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      letter-spacing: 0.04em;
+    }
+    .card h2 span { color: var(--muted); font-weight: 400; font-size: 0.85rem; margin-left: 8px; }
+
+    /* ── Zoomable ER diagram ───────────────────────────── */
+    .zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .zoom-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .zoom-btn:hover { border-color: var(--accent); background: #1a2035; }
+    .zoom-hint {
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    /* ── Hardcoded ER diagram ─────────────────────────── */
+    .er-canvas {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: auto;
+      padding: 32px;
+      position: relative;
+    }
+    .er-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 24px 32px;
+      min-width: 1100px;
+    }
+    .er-entity {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      font-size: 0.85rem;
+    }
+    .er-entity-head {
+      padding: 10px 14px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.03em;
+      color: #fff;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .er-entity-head .er-icon { font-size: 1.1rem; }
+    .er-entity-head .er-java { font-size: 0.7rem; color: var(--muted); font-weight: 400; }
+    .er-entity.group-user   .er-entity-head { border-left: 3px solid var(--gold); }
+    .er-entity.group-card   .er-entity-head { border-left: 3px solid var(--accent); }
+    .er-entity.group-habit  .er-entity-head { border-left: 3px solid var(--blue); }
+    .er-entity.group-goal   .er-entity-head { border-left: 3px solid var(--green); }
+    .er-entity.group-activity .er-entity-head { border-left: 3px solid var(--orange); }
+    .er-entity.group-job    .er-entity-head { border-left: 3px solid var(--danger); }
+    .er-fields { padding: 6px 0; }
+    .er-f {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 14px; font-family: 'Courier New', monospace; font-size: 0.8rem; color: var(--text);
+    }
+    .er-f:hover { background: rgba(255,255,255,0.03); }
+    .er-f .ft { color: var(--muted); font-size: 0.72rem; font-style: italic; margin-left: auto; }
+    .er-fk-line {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px; font-size: 0.72rem; color: var(--accent);
+      border-top: 1px dashed rgba(123,110,246,0.3);
+      margin-top: 2px;
+    }
+    .er-span2 { grid-column: span 2; }
+    .er-span4 { grid-column: span 4; }
+
+    /* relationship arrows row */
+    .er-relations {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 24px;
+      padding: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .er-rel {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.82rem;
+    }
+    .er-rel .parent { color: var(--gold); font-family: monospace; font-weight: 600; }
+    .er-rel .arrow  { color: var(--muted); font-size: 1rem; }
+    .er-rel .child  { color: var(--accent); font-family: monospace; font-weight: 600; }
+    .er-rel .card-label { color: var(--muted); font-size: 0.75rem; }
+
+    /* non-ER mermaid (flowcharts) keep normal scroll */
+    .mermaid-wrap {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      overflow-x: auto;
+      text-align: center;
+    }
+    .mermaid-wrap .mermaid { display: inline-block; }
+
+    /* ── Table grid ────────────────────────────────────── */
+    .tables-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .tbl {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .tbl-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 0.03em;
+    }
+    .tbl-name { color: #fff; }
+    .tbl-entity { color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+    .tbl-icon { font-size: 1.1rem; }
+
+    .tbl-body { padding: 8px 0; }
+    .col-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 16px;
+      font-size: 0.82rem;
+    }
+    .col-row:hover { background: rgba(255,255,255,0.03); }
+    .col-name { flex: 1; color: var(--text); font-family: 'Courier New', monospace; }
+    .col-type { color: var(--muted); font-size: 0.75rem; font-style: italic; min-width: 80px; text-align: right; }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .tag-pk  { background: rgba(240,192,96,0.15); color: var(--gold); border: 1px solid rgba(240,192,96,0.3); }
+    .tag-fk  { background: rgba(123,110,246,0.15); color: var(--accent); border: 1px solid rgba(123,110,246,0.3); }
+    .tag-fkl { background: rgba(123,110,246,0.07); color: #9d92f5; border: 1px dashed rgba(123,110,246,0.3); } /* logical FK */
+    .tag-uk  { background: rgba(96,165,250,0.12); color: var(--blue); border: 1px solid rgba(96,165,250,0.3); }
+    .tag-nn  { background: rgba(248,113,113,0.1); color: var(--danger); border: 1px solid rgba(248,113,113,0.25); }
+
+    /* group accent stripes */
+    .group-user     .tbl-header { border-left: 3px solid var(--gold); }
+    .group-card     .tbl-header { border-left: 3px solid var(--accent); }
+    .group-habit    .tbl-header { border-left: 3px solid var(--blue); }
+    .group-goal     .tbl-header { border-left: 3px solid var(--green); }
+    .group-activity .tbl-header { border-left: 3px solid var(--orange); }
+    .group-job      .tbl-header { border-left: 3px solid var(--danger); }
+
+    /* ── Relationship table ─────────────────────────────── */
+    .rel-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .rel-table th {
+      text-align: left;
+      padding: 10px 14px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .rel-table td { padding: 9px 14px; border-bottom: 1px solid rgba(30,37,53,0.6); }
+    .rel-table tr:last-child td { border-bottom: none; }
+    .rel-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .rel-from  { color: var(--gold); font-family: monospace; font-size: 0.82rem; }
+    .rel-to    { color: var(--accent); font-family: monospace; font-size: 0.82rem; }
+    .rel-card  { color: var(--muted); font-size: 0.8rem; }
+    .cardinality { text-align: center; font-size: 1rem; }
+
+    .cascade-all    { color: var(--danger);  font-size: 0.78rem; font-weight: 600; }
+    .cascade-pm     { color: #fbbf24;         font-size: 0.78rem; font-weight: 600; }
+    .cascade-none   { color: var(--muted);    font-size: 0.78rem; }
+    .cascade-logic  { color: #9d92f5;         font-size: 0.78rem; font-style: italic; }
+    .cascade-db     { color: var(--blue);     font-size: 0.78rem; }
+
+    /* ── Enum section ──────────────────────────────────── */
+    .stage-pills { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+    .stage-pill {
+      padding: 6px 18px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      border: 1px solid;
+    }
+    .stage-storm    { background: rgba(74,85,104,0.25);   color: #94a3b8; border-color: var(--storm); }
+    .stage-fog      { background: rgba(107,114,128,0.2);  color: #9ca3af; border-color: var(--fog); }
+    .stage-clearing { background: rgba(123,110,246,0.2);  color: var(--clearing); border-color: var(--clearing); }
+    .stage-aura     { background: rgba(96,165,250,0.2);   color: var(--aura);     border-color: var(--aura); }
+    .stage-radiance { background: rgba(240,192,96,0.2);   color: var(--radiance); border-color: var(--radiance); }
+    .stage-legend   { background: rgba(74,222,128,0.2);   color: var(--legend);   border-color: var(--legend); }
+
+    .enum-row { margin-top: 18px; }
+    .enum-row h3 { font-size: 0.9rem; color: var(--text); font-weight: 600; margin-bottom: 8px; }
+    .enum-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .enum-pill {
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      border: 1px solid;
+    }
+    .ep-none       { background: rgba(90,100,120,0.2);  color: #94a3b8;      border-color: #4a5568; }
+    .ep-generating { background: rgba(251,146,60,0.15); color: var(--orange); border-color: var(--orange); }
+    .ep-ready      { background: rgba(74,222,128,0.15); color: var(--green);  border-color: var(--green); }
+    .ep-failed     { background: rgba(248,113,113,0.15); color: var(--danger); border-color: var(--danger); }
+    .ep-queued     { background: rgba(90,100,120,0.2);  color: #94a3b8;      border-color: #4a5568; }
+    .ep-prompting  { background: rgba(123,110,246,0.2); color: var(--accent); border-color: var(--accent); }
+    .ep-imaging    { background: rgba(96,165,250,0.2);  color: var(--blue);   border-color: var(--blue); }
+    .ep-completed  { background: rgba(74,222,128,0.15); color: var(--green);  border-color: var(--green); }
+    .ep-waiting    { background: rgba(90,100,120,0.2);  color: #94a3b8;      border-color: #4a5568; }
+    .ep-running    { background: rgba(251,146,60,0.15); color: var(--orange); border-color: var(--orange); }
+    .ep-done       { background: rgba(74,222,128,0.15); color: var(--green);  border-color: var(--green); }
+    .ep-skipped    { background: rgba(96,165,250,0.15); color: var(--blue);   border-color: var(--blue); }
+    .ep-prompt     { background: rgba(240,192,96,0.15); color: var(--gold);   border-color: var(--gold); }
+    .ep-image      { background: rgba(123,110,246,0.2); color: var(--accent); border-color: var(--accent); }
+
+    .enum-info { margin-top: 16px; color: var(--muted); font-size: 0.83rem; line-height: 1.7; }
+    .enum-info code { background: var(--surface2); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; color: var(--text); }
+
+    /* ── Notes ─────────────────────────────────────────── */
+    .notes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 700px) { .notes-grid { grid-template-columns: 1fr; } }
+    .note {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .note h4 { color: var(--gold); font-size: 0.85rem; margin-bottom: 8px; }
+    .note ul { list-style: none; padding: 0; }
+    .note ul li { color: var(--text); font-size: 0.82rem; padding: 3px 0; }
+    .note ul li::before { content: "→ "; color: var(--muted); }
+
+    /* mermaid theme override */
+    .mermaid svg { max-width: 100%; }
+    .mermaid-scene .mermaid svg { max-width: none; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────── -->
+<div class="header">
+  <h1>⚡ Destiny Oracle — Database Schema</h1>
+  <p>Entity-Relationship diagram · All tables, columns & cascade rules</p>
+  <div class="badge-row">
+    <span class="badge badge-spring">Spring Boot 3.3.4</span>
+    <span class="badge badge-pg">PostgreSQL 16</span>
+    <span class="badge badge-java">Java 21</span>
+    <span class="badge badge-tables">11 Tables</span>
+  </div>
+</div>
+
+<!-- ── ER Diagram (pure HTML) ──────────────────────────── -->
+<div class="card">
+  <h2>Entity-Relationship Diagram <span>— 11 tables · scroll to see all</span></h2>
+
+  <div style="text-align:center; padding: 16px 0;">
+    <img src="er-diagram.png" alt="ER Diagram — 11 tables" style="max-width:100%; border-radius:10px; border:1px solid var(--border);" />
+    <p style="color:var(--muted); font-size:0.8rem; margin-top:10px;">Right-click → Open image in new tab for full resolution</p>
+  </div>
+</div>
+
+<!-- ── Table Details ──────────────────────────────────── -->
+<div class="card">
+  <h2>Table Column Reference <span>— PK = primary key · FK = foreign key · UK = unique</span></h2>
+  <div class="tables-grid">
+
+    <!-- users -->
+    <div class="tbl group-user">
+      <div class="tbl-header">
+        <span class="tbl-icon">👤</span>
+        <div>
+          <div class="tbl-name">users</div>
+          <div class="tbl-entity">AppUser.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">email</span><span class="tag tag-uk">UK</span><span class="col-type">varchar</span></div>
+        <div class="col-row"><span class="col-name">display_name</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(100)</span></div>
+        <div class="col-row"><span class="col-name">avatar_url</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">chibi_url</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">chibi_generated_at</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">onboarding_complete</span><span class="col-type">bool</span></div>
+        <div class="col-row"><span class="col-name">joined_at</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">timezone</span><span class="col-type">varchar(64)</span></div>
+        <div class="col-row"><span class="col-name">notifications_enabled</span><span class="col-type">bool</span></div>
+        <div class="col-row"><span class="col-name">daily_reminder_time</span><span class="col-type">varchar(5)</span></div>
+        <div class="col-row"><span class="col-name">created_at</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">updated_at</span><span class="col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+    <!-- destiny_cards -->
+    <div class="tbl group-card">
+      <div class="tbl-header">
+        <span class="tbl-icon">🃏</span>
+        <div>
+          <div class="tbl-name">destiny_cards</div>
+          <div class="tbl-entity">DestinyCard.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">user_id</span><span class="tag tag-fk">FK</span><span class="col-type">uuid → users</span></div>
+        <div class="col-row"><span class="col-name">aspect_key</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(50)</span></div>
+        <div class="col-row"><span class="col-name">aspect_label</span><span class="col-type">varchar(100)</span></div>
+        <div class="col-row"><span class="col-name">aspect_icon</span><span class="col-type">varchar(10)</span></div>
+        <div class="col-row"><span class="col-name">is_custom_aspect</span><span class="col-type">bool</span></div>
+        <div class="col-row"><span class="col-name">sort_order</span><span class="col-type">int</span></div>
+        <div class="col-row"><span class="col-name">fear_original</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">dream_original</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">current_stage</span><span class="col-type">varchar(20)</span></div>
+        <div class="col-row"><span class="col-name">stage_progress_percent</span><span class="col-type">int</span></div>
+        <div class="col-row"><span class="col-name">total_check_ins</span><span class="col-type">int</span></div>
+        <div class="col-row"><span class="col-name">longest_streak</span><span class="col-type">int</span></div>
+        <div class="col-row"><span class="col-name">current_streak</span><span class="col-type">int</span></div>
+        <div class="col-row"><span class="col-name">days_at_current_stage</span><span class="col-type">int</span></div>
+        <div class="col-row"><span class="col-name">image_url</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">prompt_status</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(20)</span></div>
+        <div class="col-row"><span class="col-name">last_updated</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">updated_at</span><span class="col-type">timestamptz</span></div>
+        <div style="padding:6px 16px;font-size:0.75rem;color:var(--muted)">
+          prompt_status = NONE | GENERATING | READY | FAILED<br>
+          Tracks Step 2 (image prompt generation) state
+        </div>
+      </div>
+    </div>
+
+    <!-- card_stage_content -->
+    <div class="tbl group-card">
+      <div class="tbl-header">
+        <span class="tbl-icon">📜</span>
+        <div>
+          <div class="tbl-name">card_stage_content</div>
+          <div class="tbl-entity">CardStageContent.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">card_id</span><span class="tag tag-fk">FK</span><span class="col-type">uuid → destiny_cards</span></div>
+        <div class="col-row"><span class="col-name">stage</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(20)</span></div>
+        <div class="col-row"><span class="col-name">title</span><span class="col-type">varchar(200)</span></div>
+        <div class="col-row"><span class="col-name">tagline</span><span class="col-type">varchar(300)</span></div>
+        <div class="col-row"><span class="col-name">lore</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">image_prompt</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">generated_at</span><span class="col-type">timestamptz</span></div>
+        <div style="padding:6px 16px;font-size:0.75rem;color:var(--muted)">
+          UNIQUE(card_id, stage)<br>
+          title/tagline/lore → written by Step 1 (Claude)<br>
+          image_prompt → written by Step 2 (Claude)
+        </div>
+      </div>
+    </div>
+
+    <!-- card_images -->
+    <div class="tbl group-card">
+      <div class="tbl-header">
+        <span class="tbl-icon">🖼</span>
+        <div>
+          <div class="tbl-name">card_images</div>
+          <div class="tbl-entity">CardImage.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">card_id</span><span class="tag tag-fk">FK</span><span class="col-type">uuid → destiny_cards</span></div>
+        <div class="col-row"><span class="col-name">stage</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(20)</span></div>
+        <div class="col-row"><span class="col-name">image_url</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">prompt_summary</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">generated_at</span><span class="col-type">timestamptz</span></div>
+        <div style="padding:6px 16px;font-size:0.75rem;color:var(--muted)">
+          Permanent gallery — images kept even after regen.<br>
+          Latest per stage shown in card detail view.
+        </div>
+      </div>
+    </div>
+
+    <!-- generation_jobs -->
+    <div class="tbl group-job">
+      <div class="tbl-header">
+        <span class="tbl-icon">⚙️</span>
+        <div>
+          <div class="tbl-name">generation_jobs</div>
+          <div class="tbl-entity">GenerationJob.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">card_id</span><span class="tag tag-fk">FK</span><span class="col-type">uuid → destiny_cards</span></div>
+        <div class="col-row"><span class="col-name">user_id</span><span class="tag tag-fkl">logical</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">job_label</span><span class="col-type">varchar(200)</span></div>
+        <div class="col-row"><span class="col-name">status</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(20)</span></div>
+        <div class="col-row"><span class="col-name">total_steps</span><span class="col-type">int (12)</span></div>
+        <div class="col-row"><span class="col-name">completed_steps</span><span class="col-type">int</span></div>
+        <div class="col-row"><span class="col-name">created_at</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">started_at</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">completed_at</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">error_message</span><span class="col-type">text</span></div>
+        <div style="padding:6px 16px;font-size:0.75rem;color:var(--muted)">
+          status = QUEUED → PROMPTING → IMAGING → COMPLETED | FAILED<br>
+          All 12 steps pre-created as WAITING so UI sees pipeline immediately
+        </div>
+      </div>
+    </div>
+
+    <!-- generation_job_steps -->
+    <div class="tbl group-job">
+      <div class="tbl-header">
+        <span class="tbl-icon">🔢</span>
+        <div>
+          <div class="tbl-name">generation_job_steps</div>
+          <div class="tbl-entity">GenerationJobStep.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">job_id</span><span class="tag tag-fk">FK</span><span class="col-type">uuid → generation_jobs</span></div>
+        <div class="col-row"><span class="col-name">step_order</span><span class="tag tag-nn">NN</span><span class="col-type">int (0–11)</span></div>
+        <div class="col-row"><span class="col-name">step_name</span><span class="col-type">varchar(100)</span></div>
+        <div class="col-row"><span class="col-name">phase</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(10)</span></div>
+        <div class="col-row"><span class="col-name">stage</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(20)</span></div>
+        <div class="col-row"><span class="col-name">status</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(20)</span></div>
+        <div class="col-row"><span class="col-name">message</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">result_url</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">started_at</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">completed_at</span><span class="col-type">timestamptz</span></div>
+        <div style="padding:6px 16px;font-size:0.75rem;color:var(--muted)">
+          phase = PROMPT (steps 0–5) | IMAGE (steps 6–11)<br>
+          status = WAITING → RUNNING → DONE | FAILED | SKIPPED<br>
+          Each step saved with REQUIRES_NEW transaction
+        </div>
+      </div>
+    </div>
+
+    <!-- habits -->
+    <div class="tbl group-habit">
+      <div class="tbl-header">
+        <span class="tbl-icon">✅</span>
+        <div>
+          <div class="tbl-name">habits</div>
+          <div class="tbl-entity">Habit.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">card_id</span><span class="tag tag-fk">FK</span><span class="col-type">uuid → destiny_cards</span></div>
+        <div class="col-row"><span class="col-name">text</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(300)</span></div>
+        <div class="col-row"><span class="col-name">frequency</span><span class="col-type">varchar(10)</span></div>
+        <div class="col-row"><span class="col-name">streak_days</span><span class="col-type">int</span></div>
+        <div class="col-row"><span class="col-name">created_at</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">updated_at</span><span class="col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+    <!-- habit_completions -->
+    <div class="tbl group-habit">
+      <div class="tbl-header">
+        <span class="tbl-icon">📅</span>
+        <div>
+          <div class="tbl-name">habit_completions</div>
+          <div class="tbl-entity">HabitCompletion.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">habit_id</span><span class="tag tag-fk">FK</span><span class="col-type">uuid → habits</span></div>
+        <div class="col-row"><span class="col-name">user_id</span><span class="tag tag-fkl">logical</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">completed_on</span><span class="tag tag-nn">NN</span><span class="col-type">date</span></div>
+        <div style="padding:6px 16px;font-size:0.75rem;color:var(--muted)">
+          UNIQUE(habit_id, completed_on)
+        </div>
+      </div>
+    </div>
+
+    <!-- goals -->
+    <div class="tbl group-goal">
+      <div class="tbl-header">
+        <span class="tbl-icon">🎯</span>
+        <div>
+          <div class="tbl-name">goals</div>
+          <div class="tbl-entity">Goal.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">user_id</span><span class="tag tag-fkl">logical</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">aspect_key</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(50)</span></div>
+        <div class="col-row"><span class="col-name">aspect_label</span><span class="col-type">varchar(100)</span></div>
+        <div class="col-row"><span class="col-name">title</span><span class="col-type">varchar(300)</span></div>
+        <div class="col-row"><span class="col-name">status</span><span class="col-type">varchar(20)</span></div>
+        <div class="col-row"><span class="col-name">created_at</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">updated_at</span><span class="col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+    <!-- milestones -->
+    <div class="tbl group-goal">
+      <div class="tbl-header">
+        <span class="tbl-icon">🏆</span>
+        <div>
+          <div class="tbl-name">milestones</div>
+          <div class="tbl-entity">Milestone.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">goal_id</span><span class="tag tag-fk">FK</span><span class="col-type">uuid → goals</span></div>
+        <div class="col-row"><span class="col-name">text</span><span class="tag tag-nn">NN</span><span class="col-type">varchar(300)</span></div>
+        <div class="col-row"><span class="col-name">status</span><span class="col-type">varchar(20)</span></div>
+        <div class="col-row"><span class="col-name">achieved_at</span><span class="col-type">timestamptz</span></div>
+        <div class="col-row"><span class="col-name">created_at</span><span class="col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+    <!-- parsed_activities -->
+    <div class="tbl group-activity">
+      <div class="tbl-header">
+        <span class="tbl-icon">⚡</span>
+        <div>
+          <div class="tbl-name">parsed_activities</div>
+          <div class="tbl-entity">ParsedActivity.java</div>
+        </div>
+      </div>
+      <div class="tbl-body">
+        <div class="col-row"><span class="col-name">id</span><span class="tag tag-pk">PK</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">user_id</span><span class="tag tag-fkl">logical</span><span class="col-type">uuid</span></div>
+        <div class="col-row"><span class="col-name">raw_input</span><span class="tag tag-nn">NN</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">aspect_key</span><span class="col-type">varchar(50)</span></div>
+        <div class="col-row"><span class="col-name">aspect_label</span><span class="col-type">varchar(100)</span></div>
+        <div class="col-row"><span class="col-name">activity_summary</span><span class="col-type">text</span></div>
+        <div class="col-row"><span class="col-name">xp_gained</span><span class="col-type">int</span></div>
+        <div class="col-row"><span class="col-name">created_at</span><span class="col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+  </div><!-- /tables-grid -->
+</div>
+
+<!-- ── Relationships ──────────────────────────────────── -->
+<div class="card">
+  <h2>Relationships & Cascade Rules <span>— what happens when a parent row is deleted</span></h2>
+  <table class="rel-table">
+    <thead>
+      <tr>
+        <th>Parent Table</th>
+        <th style="text-align:center">→</th>
+        <th>Child Table</th>
+        <th>FK Column</th>
+        <th>Cardinality</th>
+        <th>JPA Cascade</th>
+        <th>DB Cascade</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="rel-from">users</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">destiny_cards</td>
+        <td><code>user_id</code></td>
+        <td>1 : N</td>
+        <td class="cascade-none">NONE</td>
+        <td class="cascade-none">none</td>
+        <td class="rel-card">Delete user manually; cards are not auto-deleted</td>
+      </tr>
+      <tr>
+        <td class="rel-from">destiny_cards</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">card_stage_content</td>
+        <td><code>card_id</code></td>
+        <td>1 : N (max 6)</td>
+        <td class="cascade-pm">PERSIST + MERGE</td>
+        <td class="cascade-db">@OnDelete CASCADE</td>
+        <td class="rel-card">Stage history preserved; DB cascade removes rows when card is deleted</td>
+      </tr>
+      <tr>
+        <td class="rel-from">destiny_cards</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">card_images</td>
+        <td><code>card_id</code></td>
+        <td>1 : N (max 6)</td>
+        <td class="cascade-pm">PERSIST + MERGE</td>
+        <td class="cascade-db">@OnDelete CASCADE</td>
+        <td class="rel-card">Image audit trail preserved; DB cascade on explicit card delete</td>
+      </tr>
+      <tr>
+        <td class="rel-from">destiny_cards</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">habits</td>
+        <td><code>card_id</code></td>
+        <td>1 : N</td>
+        <td class="cascade-all">ALL + orphanRemoval</td>
+        <td class="cascade-none">none</td>
+        <td class="rel-card">Habits fully owned by card; removing from list deletes them</td>
+      </tr>
+      <tr>
+        <td class="rel-from">destiny_cards</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">generation_jobs</td>
+        <td><code>card_id</code></td>
+        <td>1 : N</td>
+        <td class="cascade-all">ALL + orphanRemoval</td>
+        <td class="cascade-db">@OnDelete CASCADE</td>
+        <td class="rel-card">Jobs and all their steps deleted when card is removed</td>
+      </tr>
+      <tr>
+        <td class="rel-from">generation_jobs</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">generation_job_steps</td>
+        <td><code>job_id</code></td>
+        <td>1 : 12</td>
+        <td class="cascade-all">ALL + orphanRemoval</td>
+        <td class="cascade-db">@OnDelete CASCADE</td>
+        <td class="rel-card">12 steps (6 PROMPT + 6 IMAGE) pre-created as WAITING; each saved via REQUIRES_NEW</td>
+      </tr>
+      <tr>
+        <td class="rel-from">habits</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">habit_completions</td>
+        <td><code>habit_id</code></td>
+        <td>1 : N</td>
+        <td class="cascade-none">NONE</td>
+        <td class="cascade-none">none</td>
+        <td class="rel-card">Delete completions explicitly before removing a habit</td>
+      </tr>
+      <tr>
+        <td class="rel-from">goals</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">milestones</td>
+        <td><code>goal_id</code></td>
+        <td>1 : N</td>
+        <td class="cascade-all">ALL + orphanRemoval</td>
+        <td class="cascade-none">none</td>
+        <td class="rel-card">Milestones fully owned by goal</td>
+      </tr>
+      <tr>
+        <td class="rel-from">users</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">goals</td>
+        <td><code>user_id</code></td>
+        <td>1 : N</td>
+        <td class="cascade-logic">logical only</td>
+        <td class="cascade-none">no FK</td>
+        <td class="rel-card">UUID stored as plain column, no DB constraint</td>
+      </tr>
+      <tr>
+        <td class="rel-from">users</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">parsed_activities</td>
+        <td><code>user_id</code></td>
+        <td>1 : N</td>
+        <td class="cascade-logic">logical only</td>
+        <td class="cascade-none">no FK</td>
+        <td class="rel-card">UUID stored as plain column, no DB constraint</td>
+      </tr>
+      <tr>
+        <td class="rel-from">users</td>
+        <td class="cardinality">→</td>
+        <td class="rel-to">habit_completions</td>
+        <td><code>user_id</code></td>
+        <td>1 : N</td>
+        <td class="cascade-logic">logical only</td>
+        <td class="cascade-none">no FK</td>
+        <td class="rel-card">Denormalized for quick query; no DB constraint</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ── Enum Reference ─────────────────────────────────── -->
+<div class="card">
+  <h2>Enum Reference <span>— all stored as VARCHAR using EnumType.STRING</span></h2>
+
+  <!-- CardStage -->
+  <div class="stage-pills">
+    <span class="stage-pill stage-storm">1 · STORM</span>
+    <span class="stage-pill stage-fog">2 · FOG</span>
+    <span class="stage-pill stage-clearing">3 · CLEARING</span>
+    <span class="stage-pill stage-aura">4 · AURA</span>
+    <span class="stage-pill stage-radiance">5 · RADIANCE</span>
+    <span class="stage-pill stage-legend">6 · LEGEND</span>
+  </div>
+  <div class="enum-info" style="margin-top:8px">
+    <code>CardStage.java</code> — used in: <code>destiny_cards.current_stage</code>, <code>card_stage_content.stage</code>, <code>card_images.stage</code>, <code>generation_job_steps.stage</code>
+  </div>
+
+  <!-- PromptStatus -->
+  <div class="enum-row">
+    <h3>PromptStatus — <code>destiny_cards.prompt_status</code> — tracks Step 2 (image prompt generation)</h3>
+    <div class="enum-pills">
+      <span class="enum-pill ep-none">NONE</span>
+      <span class="enum-pill ep-generating">GENERATING</span>
+      <span class="enum-pill ep-ready">READY</span>
+      <span class="enum-pill ep-failed">FAILED</span>
+    </div>
+    <div class="enum-info">
+      <code>NONE</code> → prompts not yet generated · <code>GENERATING</code> → Claude running ·
+      <code>READY</code> → prompts exist, Gemini can start · <code>FAILED</code> → Step 2 errored<br>
+      Regenerating stage content resets status to <code>NONE</code> so image prompts also regenerate.
+    </div>
+  </div>
+
+  <!-- JobStatus -->
+  <div class="enum-row">
+    <h3>JobStatus — <code>generation_jobs.status</code> — overall pipeline run state</h3>
+    <div class="enum-pills">
+      <span class="enum-pill ep-queued">QUEUED</span>
+      <span class="enum-pill ep-prompting">PROMPTING</span>
+      <span class="enum-pill ep-imaging">IMAGING</span>
+      <span class="enum-pill ep-completed">COMPLETED</span>
+      <span class="enum-pill ep-failed">FAILED</span>
+    </div>
+    <div class="enum-info">
+      <code>QUEUED</code> → job created, not started · <code>PROMPTING</code> → Claude writing prompts (steps 0–5) ·
+      <code>IMAGING</code> → Gemini generating images (steps 6–11) · <code>COMPLETED</code> → all done ·
+      <code>FAILED</code> → pipeline errored; check <code>error_message</code>
+    </div>
+  </div>
+
+  <!-- StepStatus -->
+  <div class="enum-row">
+    <h3>StepStatus — <code>generation_job_steps.status</code> — individual step lifecycle</h3>
+    <div class="enum-pills">
+      <span class="enum-pill ep-waiting">WAITING</span>
+      <span class="enum-pill ep-running">RUNNING</span>
+      <span class="enum-pill ep-done">DONE</span>
+      <span class="enum-pill ep-skipped">SKIPPED</span>
+      <span class="enum-pill ep-failed">FAILED</span>
+    </div>
+    <div class="enum-info">
+      All 12 steps start as <code>WAITING</code> — UI sees full pipeline immediately before execution begins.<br>
+      <code>SKIPPED</code> = prompt already in DB (cost saving — Claude not called again). Gate: IMAGE steps never start until all PROMPT steps are <code>DONE</code> or <code>SKIPPED</code>.<br>
+      Each status change commits in its own <code>REQUIRES_NEW</code> transaction so UI polling always sees current state.
+    </div>
+  </div>
+
+  <!-- JobPhase -->
+  <div class="enum-row">
+    <h3>JobPhase — <code>generation_job_steps.phase</code> — which AI is running</h3>
+    <div class="enum-pills">
+      <span class="enum-pill ep-prompt">PROMPT</span>
+      <span class="enum-pill ep-image">IMAGE</span>
+    </div>
+    <div class="enum-info">
+      <code>PROMPT</code> = steps 0–5 (Claude writes image prompt per stage, sequential) ·
+      <code>IMAGE</code> = steps 6–11 (Gemini Imagen generates PNG, all 6 fire in parallel via virtual threads)
+    </div>
+  </div>
+
+  <div class="enum-info" style="margin-top:16px">
+    <p>Valid values for <code>habits.frequency</code>: <code>"daily"</code> | <code>"weekly"</code></p>
+    <p>Valid values for <code>goals.status</code>: <code>"active"</code> | <code>"completed"</code> | <code>"paused"</code></p>
+    <p>Valid values for <code>milestones.status</code>: <code>"pending"</code> | <code>"achieved"</code></p>
+  </div>
+</div>
+
+<!-- ── Dev Notes ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Developer Notes</h2>
+  <div class="notes-grid">
+
+    <div class="note">
+      <h4>🔑 Authentication</h4>
+      <ul>
+        <li>No login system — pass <code>X-User-Id</code> header (UUID)</li>
+        <li>Missing header → falls back to default demo user</li>
+        <li>Default user UUID: <code>00000000-0000-0000-0000-000000000001</code></li>
+        <li>Demo user seeded by <code>DataInitializer.java</code> on first boot</li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <h4>🌱 Seeded Data (on first boot)</h4>
+      <ul>
+        <li>1 demo user (default UUID above)</li>
+        <li>5 starter cards: health, career, finances, relationships, family</li>
+        <li>2 sample goals with milestones</li>
+        <li>Remaining 5 aspects added via POST /api/v1/cards</li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <h4>🤖 AI Pipeline (3-step, mandatory order)</h4>
+      <ul>
+        <li>Step 1 (Claude): fear+dream → title/tagline/lore × 6 stages</li>
+        <li>Step 2 (Claude): title+lore → 6 Imagen-ready text prompts</li>
+        <li>Step 3 (Gemini): 6 prompts → 6 PNG images in parallel</li>
+        <li>Without API keys: Steps 1+2 fallback; Step 3 returns placeholder URLs</li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <h4>⚙️ Job Tracking (UI polling)</h4>
+      <ul>
+        <li>12 steps pre-created as WAITING before pipeline starts</li>
+        <li>Step saves use <code>REQUIRES_NEW</code> — visible immediately to UI</li>
+        <li>Poll: <code>GET /{cardId}/jobs/latest</code> every 2–3 seconds</li>
+        <li>Stop polling when job.status = COMPLETED | FAILED</li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <h4>⚙️ Required Environment Variables</h4>
+      <ul>
+        <li><code>ANTHROPIC_API_KEY</code> — Claude API key (Steps 1+2)</li>
+        <li><code>GOOGLE_CLOUD_PROJECT_ID</code> — GCP project for Gemini</li>
+        <li><code>GCS_BUCKET</code> — Google Cloud Storage bucket</li>
+        <li><code>DATABASE_URL / USERNAME / PASSWORD</code> — optional (defaults to localhost)</li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <h4>🗃️ Schema Management</h4>
+      <ul>
+        <li><code>ddl-auto: update</code> — Hibernate auto-creates tables</li>
+        <li>No Flyway migrations needed for development</li>
+        <li>All IDs are UUID v4 (PostgreSQL <code>uuid</code> type)</li>
+        <li>All timestamps use <code>Instant</code> → stored as <code>timestamptz</code></li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <h4>🌐 API Base URL</h4>
+      <ul>
+        <li>Backend: <code>http://localhost:8080</code></li>
+        <li>Landing page: <code>/</code></li>
+        <li>Swagger UI: <code>/swagger-ui.html</code></li>
+        <li>Admin Console: <code>/docs/admin-test.html</code></li>
+        <li>Pipeline logs: <code>tail -f logs/pipeline.log</code></li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <h4>📂 Log Files</h4>
+      <ul>
+        <li><code>logs/destiny-oracle.log</code> — all application logs (30 days)</li>
+        <li><code>logs/pipeline.log</code> — AI pipeline steps only (14 days)</li>
+        <li>Both roll daily; live view: <code>tail -f logs/pipeline.log</code></li>
+        <li>Pipeline loggers at DEBUG; root at INFO</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Workflow 1 ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Workflow 1 — Standard API Request <span>— Angular → Spring Boot → PostgreSQL</span></h2>
+  <div class="mermaid-wrap">
+    <div class="mermaid">
+%%{init:{"theme":"dark","themeVariables":{"primaryColor":"#161b27","primaryTextColor":"#c8d0e0","primaryBorderColor":"#7b6ef6","lineColor":"#f0c060","fontFamily":"Segoe UI, system-ui"}}}%%
+flowchart LR
+    A([Angular\nFrontend\n:4200]) -->|"HTTP + X-User-Id header"| B[CardController\n/api/v1/cards]
+    B --> C{Resolve\nUser ID}
+    C -->|"header present"| D[Use header UUID]
+    C -->|"no header"| E[Default demo\nuser UUID]
+    D & E --> F[CardService\nImpl]
+    F -->|"findAllByUserId()"| G[(PostgreSQL\ndestiny_oracle\n:5432)]
+    G -->|"List&lt;DestinyCard&gt;"| F
+    F -->|"map to DTOs"| B
+    B -->|"ApiResponse&lt;T&gt; JSON"| A
+    </div>
+  </div>
+</div>
+
+<!-- ── Workflow 2 ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Workflow 2 — AI Pipeline: Fear+Dream → 6 Stage Images <span>— 3 steps, mandatory order</span></h2>
+  <div class="mermaid-wrap">
+    <div class="mermaid">
+%%{init:{"theme":"dark","themeVariables":{"primaryColor":"#161b27","primaryTextColor":"#c8d0e0","primaryBorderColor":"#7b6ef6","lineColor":"#f0c060","fontFamily":"Segoe UI, system-ui"}}}%%
+flowchart TD
+    USER([User submits\nfear + dream text\nPOST /api/v1/cards]) --> S1
+
+    subgraph S1 ["⭐ STEP 1 — Stage Content (StageContentGenerationServiceImpl)"]
+      direction TB
+      SC1[Load card: aspectLabel + fearText + dreamText]
+      SC2{{Claude API\nclaude-3-5-haiku\nWrites 6× title + tagline + lore}}
+      SC3[Parse STORM / FOG / CLEARING / AURA / RADIANCE / LEGEND blocks]
+      SC4[(Upsert card_stage_content\ntitle • tagline • lore per stage)]
+      SC1 --> SC2 --> SC3 --> SC4
+    end
+
+    SC4 -->|"Stage content in DB\n(emotional context for prompts)"| S2
+
+    subgraph S2 ["⭐ STEP 2 — Image Prompts (ImagePromptServiceImpl)"]
+      direction TB
+      IP1{promptStatus\n= READY?}
+      IP2[SKIP — reuse existing prompts\nmark 6 steps as SKIPPED]
+      IP3{{Claude API\nclaude-3-5-haiku\nWrites 6 Imagen text prompts\nusing title + lore as context}}
+      IP4[(Save image_prompt\nper row in card_stage_content\nSet promptStatus = READY)]
+      IP1 -->|yes| IP2
+      IP1 -->|no| IP3 --> IP4
+    end
+
+    S2 -->|"assertAllPromptsDone() gate\nAll PROMPT steps must be DONE or SKIPPED"| S3
+
+    subgraph S3 ["⭐ STEP 3 — Image Generation (CardImageGenerationServiceImpl)"]
+      direction LR
+      IG1[newVirtualThreadPerTaskExecutor\nJava 21 virtual threads]
+      IG2[storm\nGemini call]
+      IG3[fog\nGemini call]
+      IG4[clearing\nGemini call]
+      IG5[aura\nGemini call]
+      IG6[radiance\nGemini call]
+      IG7[legend\nGemini call]
+      IG1 --> IG2 & IG3 & IG4 & IG5 & IG6 & IG7
+    end
+
+    S3 -->|"chibi_url as style ref\n3:4 portrait ratio"| GEM{{Gemini Imagen 3\nVertexAI SDK}}
+    GEM -->|"base64 PNG bytes"| GCS[Upload to\nGoogle Cloud Storage]
+    GCS -->|"public GCS URL"| DB2[(Upsert card_images\nUpdate destiny_cards.image_url\nif current stage)]
+    DB2 --> DONE([Job status = COMPLETED\npolling returns 12/12 steps DONE])
+
+    subgraph JOB ["🔢 Job Tracking (runs alongside pipeline)"]
+      direction TB
+      J1[createJob: 12 steps pre-created as WAITING\nsaveAndFlush — UI sees pipeline immediately]
+      J2[Each step: WAITING → RUNNING → DONE/SKIPPED/FAILED\nCommits via REQUIRES_NEW transaction]
+      J3[Poll: GET /cards/{id}/jobs/latest every 2-3s]
+      J1 --> J2 --> J3
+    end
+    </div>
+  </div>
+</div>
+
+<!-- ── Workflow 3 ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Workflow 3 — Daily Check-In & Habit Tracking <span>— streak + progress update</span></h2>
+  <div class="mermaid-wrap">
+    <div class="mermaid">
+%%{init:{"theme":"dark","themeVariables":{"primaryColor":"#161b27","primaryTextColor":"#c8d0e0","primaryBorderColor":"#7b6ef6","lineColor":"#f0c060","fontFamily":"Segoe UI, system-ui"}}}%%
+flowchart TD
+    A([PUT /api/v1/cards/{cardId}\n/habits/{habitId}/complete]) --> B{completed\n= true?}
+    B -->|yes| C{Already logged\ntoday?}
+    C -->|no| D[INSERT habit_completions\nhabit_id + user_id + today]
+    D --> E[Increment habit.streak_days\nIncrement card.total_check_ins]
+    E --> F{streak &gt; card\n.longest_streak?}
+    F -->|yes| G[Update longest_streak]
+    F -->|no| H[Recalculate\nstage_progress_percent]
+    G --> H
+    C -->|yes| I([No-op — idempotent])
+    B -->|no| J[DELETE habit_completions\nfor today]
+    J --> K[Decrement streak_days\nDecrement total_check_ins]
+    K --> H
+    H --> L{progress ≥ 100%?}
+    L -->|yes| M[Advance current_stage\nto next enum value\nReset progress to 0]
+    L -->|no| N([Return updated CardDetailResponse])
+    M --> N
+    </div>
+  </div>
+</div>
+
+<!-- ── Workflow 4 ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Workflow 4 — Card Lifecycle <span>— add · edit · remove an aspect card</span></h2>
+  <div class="mermaid-wrap">
+    <div class="mermaid">
+%%{init:{"theme":"dark","themeVariables":{"primaryColor":"#161b27","primaryTextColor":"#c8d0e0","primaryBorderColor":"#7b6ef6","lineColor":"#f0c060","fontFamily":"Segoe UI, system-ui"}}}%%
+flowchart LR
+    subgraph ADD [POST /api/v1/cards]
+      direction TB
+      A1{Aspect key\nalready exists\nfor user?} -->|yes| A2([409 Conflict])
+      A1 -->|no| A3[Resolve label + icon\nfrom BUILT_IN_ASPECTS map\nor request body if custom]
+      A3 --> A4[Create DestinyCard\ncurrentStage = STORM\nprogress = 0]
+      A4 --> A5[Auto-trigger Step 1\nStageContentGenerationService\nClaude writes 6× title+tagline+lore]
+      A5 --> A6[(Save to DB\nsortOrder = count+1)]
+    end
+
+    subgraph EDIT [PATCH /api/v1/cards/{id}]
+      direction TB
+      B1[Load card\nassert ownership] --> B2[Update fear / dream\nnon-null fields only]
+      B2 --> B3[Update label + icon\n(any card — built-in or custom)]
+      B3 --> B4[(Save to DB)]
+      B4 --> B5[Call regenerate-stage-content\nto re-run Step 1 with new fear/dream\nResets promptStatus = NONE]
+    end
+
+    subgraph REMOVE [DELETE /api/v1/cards/{id}]
+      direction TB
+      C1[Load card\nassert ownership] --> C2[Delete card\nDB CASCADE removes:\ncard_stage_content\ncard_images\ngeneration_jobs + steps\nhabits + completions]
+      C2 --> C3[(Removed from DB)]
+    end
+    </div>
+  </div>
+</div>
+
+<!-- ── Workflow 5 ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Workflow 5 — Onboarding Flow <span>— what happens on first launch</span></h2>
+  <div class="mermaid-wrap">
+    <div class="mermaid">
+%%{init:{"theme":"dark","themeVariables":{"primaryColor":"#161b27","primaryTextColor":"#c8d0e0","primaryBorderColor":"#7b6ef6","lineColor":"#f0c060","fontFamily":"Segoe UI, system-ui"}}}%%
+flowchart TD
+    A([App boots]) --> B{DataInitializer\nuser exists?}
+    B -->|no - first boot| C[Seed demo user\nUUID: 000...0001]
+    C --> D[Seed 5 starter cards\nhealth · career · finances\nrelationships · family]
+    D --> E[Seed 2 goals\nhealth + creativity]
+    E --> F[Seed milestones\nfor each goal]
+    B -->|yes - already seeded| G([Skip — idempotent])
+
+    F --> H([Angular loads GET /api/v1/cards])
+    G --> H
+    H --> I{onboarding_complete\n= false?}
+    I -->|yes| J[Show onboarding wizard\n4 steps: welcome → philosophy\n→ fear input × aspects\n→ spread reveal]
+    I -->|no| K[Go directly to\nSpread dashboard]
+    J -->|PATCH user.onboardingComplete = true| K
+    K --> L([User sees their\n5 destiny cards])
+    </div>
+  </div>
+</div>
+
+<script>
+  // Mermaid only needed for the workflow flowcharts below — ER diagram is pure HTML
+</script>
+
+</body>
+</html>

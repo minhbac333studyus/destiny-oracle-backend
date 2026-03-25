@@ -1,0 +1,19 @@
+# Secrets
+.env
+*.env
+src/main/resources/application-*.yml
+
+# Build
+target/
+*.jar
+
+# Logs
+logs/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store

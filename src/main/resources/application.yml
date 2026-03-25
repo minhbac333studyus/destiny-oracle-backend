@@ -1,0 +1,91 @@
+spring:
+  application:
+    name: destiny-oracle-backend
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/destiny_oracle}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      max-lifetime: 600000          # 10 min — keeps connections alive during long image pipelines
+      idle-timeout: 300000          # 5 min idle before recycle
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  jpa:
+    hibernate:
+      ddl-auto: update        # Hibernate auto-creates / updates tables from entities
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}   # Set your Anthropic API key; "disabled" skips AI prompt generation
+      chat:
+        options:
+#          model: claude-sonnet-4-6  # Fast + affordable for prompt generation
+          model: claude-haiku-4-5-20251001  # Fast + affordable for prompt generation
+          max-tokens:  20000
+
+logging:
+  file:
+    path: ${LOG_PATH:logs}          # logs/ folder next to the JAR / project root
+  pattern:
+    console: "%d{HH:mm:ss} %-5level %logger{36} - %msg%n"
+    file:    "%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.destinyoracle: DEBUG        # our code — full debug output
+    org.springframework: INFO
+    org.hibernate.SQL: WARN         # set to DEBUG to see every SQL query
+
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# App-level config (Image generation, GCS, CORS, default user)
+app:
+  # Image provider: "gemini" or "modelslab"
+  image-provider: ${IMAGE_PROVIDER:modelslab}
+  gemini:
+    api-key: ${GEMINI_API_KEY}
+    model: gemini-2.5-flash-image
+  modelslab:
+    api-key: ${MODELSLAB_API_KEY}                         # Get key at https://modelslab.com/dashboard
+    model-id: ${MODELSLAB_MODEL:qwen}              # Anime-optimized SD model
+    base-url: ${MODELSLAB_URL:https://modelslab.com/api/v6/images/text2img}
+    width: 576
+    height: 1024
+  gcs:
+    bucket: ${GCS_BUCKET:destiny-oracle-assets}
+  default-user-id: ${DEFAULT_USER_ID:00000000-0000-0000-0000-000000000001}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
+
+#https://console.cloud.google.com/storage/browser/destiny-oracle-assets;tab=objects?project=pokemongod&supportedpurview=project&prefix=&forceOnObjectsSortingFiltering=false

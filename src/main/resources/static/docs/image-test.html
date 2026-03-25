@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html><head><title>Image Test</title>
+<style>body{background:#111;color:#fff;font-family:sans-serif;padding:20px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:900px}
+.card{background:#1a1a2e;border:1px solid #333;border-radius:8px;overflow:hidden}
+.card h3{margin:0;padding:8px;font-size:13px;color:#f0c060}
+.card img{width:100%;aspect-ratio:3/4;object-fit:cover}
+.card p{padding:4px 8px;font-size:11px;color:#888;word-break:break-all}
+</style></head><body>
+<h2>Image Test — Direct from API</h2>
+<button onclick="load()">Load Card Images</button>
+<pre id="log" style="font-size:12px;color:#0f0"></pre>
+<div class="grid" id="grid"></div>
+<script>
+async function load() {
+  const log = document.getElementById('log');
+  const grid = document.getElementById('grid');
+  const cardId = '13efbc9c-466e-4669-83d4-c511aa11bad8';
+  const userId = '00000000-0000-0000-0000-000000000001';
+
+  log.textContent = 'Fetching card...\n';
+  const res = await fetch('/api/v1/cards/' + cardId, { headers: {'X-User-Id': userId} });
+  const json = await res.json();
+  const card = json.data;
+
+  log.textContent += 'imageHistory length: ' + (card.imageHistory || []).length + '\n';
+  (card.imageHistory || []).forEach(img => {
+    log.textContent += '  ' + img.stage + ' → ' + img.imageUrl + '\n';
+  });
+
+  const t = Date.now();
+  grid.innerHTML = (card.imageHistory || []).map(img => `
+    <div class="card">
+      <h3>${img.stage}</h3>
+      <img src="${img.imageUrl}?t=${t}" />
+      <p>${img.imageUrl}</p>
+    </div>
+  `).join('');
+}
+</script>
+</body></html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conquer Future — Admin Debug</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 24px; }
+  h1 { font-size: 24px; margin-bottom: 8px; color: #d4a856; }
+  h2 { font-size: 18px; margin: 24px 0 12px; color: #7ee787; border-bottom: 1px solid #30363d; padding-bottom: 6px; }
+  h3 { font-size: 14px; margin: 16px 0 8px; color: #79c0ff; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 24px; }
+  .controls { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+  input, select { background: #161b22; border: 1px solid #30363d; color: #e6edf3; padding: 8px 12px; border-radius: 6px; font-size: 14px; }
+  input:focus, select:focus { border-color: #58a6ff; outline: none; }
+  button { background: #238636; border: none; color: #fff; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  button:hover { background: #2ea043; }
+  button.danger { background: #da3633; }
+  button.secondary { background: #30363d; }
+  .card-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .card-item { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; cursor: pointer; transition: border-color 0.2s; }
+  .card-item:hover { border-color: #58a6ff; }
+  .card-item.active { border-color: #d4a856; }
+  .card-label { font-weight: 600; font-size: 15px; }
+  .card-meta { font-size: 12px; color: #8b949e; margin-top: 4px; }
+  .stage-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .stage-storm { background: #1f3d5c; color: #79c0ff; }
+  .stage-fog { background: #2d2d3d; color: #b0b0cc; }
+  .stage-clearing { background: #3d3520; color: #e3b341; }
+  .stage-aura { background: #2d1f4e; color: #bc8cff; }
+  .stage-radiance { background: #4e3a1f; color: #f0c040; }
+  .stage-legend { background: #4e1f3a; color: #ff9bce; }
+  .detail-panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
+  .section { margin-bottom: 20px; }
+  .field { margin-bottom: 12px; }
+  .field-label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8b949e; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .field-value { font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .field-value.mono { font-family: 'Fira Code', 'Consolas', monospace; font-size: 12px; background: #0d1117; padding: 8px; border-radius: 4px; border: 1px solid #21262d; }
+  .field-value.fear { color: #f85149; }
+  .field-value.dream { color: #7ee787; }
+  .field-value.action { color: #ffa657; }
+  .field-value.prompt { color: #d2a8ff; }
+  .stage-block { background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+  .stage-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .img-thumb { width: 80px; height: 142px; object-fit: cover; border-radius: 4px; border: 1px solid #30363d; }
+  .img-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .pipeline { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pipeline-step { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+  .pipeline-step.done { background: #238636; color: #fff; }
+  .pipeline-step.pending { background: #30363d; color: #8b949e; }
+  .user-list { margin-bottom: 24px; }
+  .user-item { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-bottom: 1px solid #21262d; }
+  .user-email { font-weight: 600; }
+  .user-meta { font-size: 12px; color: #8b949e; }
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab { padding: 8px 16px; border-radius: 6px 6px 0 0; background: #161b22; border: 1px solid #30363d; border-bottom: none; cursor: pointer; font-size: 13px; color: #8b949e; }
+  .tab.active { background: #0d1117; color: #e6edf3; border-color: #30363d; }
+  #loading { text-align: center; padding: 40px; color: #8b949e; }
+  .empty { text-align: center; padding: 40px; color: #484f58; }
+</style>
+</head>
+<body>
+
+<h1>Conquer Future — Admin Debug</h1>
+<p class="subtitle">Developer tool for inspecting cards, prompts, action scenes, and the full generation pipeline.</p>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="showTab('cards')">Cards</div>
+  <div class="tab" onclick="showTab('users')">Users</div>
+</div>
+
+<div id="tab-cards">
+  <div class="controls">
+    <input id="userId" type="text" placeholder="User ID (leave blank for default)" style="width: 360px" />
+    <button onclick="loadCards()">Load Cards</button>
+  </div>
+  <div id="card-list" class="card-list"></div>
+  <div id="card-detail"></div>
+</div>
+
+<div id="tab-users" style="display:none">
+  <div id="user-list"></div>
+</div>
+
+<div id="loading" style="display:none">Loading...</div>
+
+<script>
+const API = '';
+
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-cards').style.display = tab === 'cards' ? '' : 'none';
+  document.getElementById('tab-users').style.display = tab === 'users' ? '' : 'none';
+  if (tab === 'users') loadUsers();
+}
+
+function headers() {
+  const h = { 'Content-Type': 'application/json' };
+  const uid = document.getElementById('userId').value.trim();
+  if (uid) h['X-User-Id'] = uid;
+  return h;
+}
+
+async function loadCards() {
+  const res = await fetch(API + '/api/v1/admin/cards', { headers: headers() });
+  const cards = await res.json();
+  const el = document.getElementById('card-list');
+  if (!cards.length) { el.innerHTML = '<div class="empty">No cards found for this user.</div>'; return; }
+  el.innerHTML = cards.map(c => `
+    <div class="card-item" onclick="loadCardDetail('${c.cardId}', this)">
+      <div class="card-label">${esc(c.aspectLabel)}</div>
+      <div class="card-meta">
+        <span class="stage-badge stage-${c.currentStage.toLowerCase()}">${c.currentStage}</span>
+        &nbsp; ${c.promptStatus} &nbsp; ${new Date(c.createdAt).toLocaleDateString()}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadCardDetail(cardId, el) {
+  document.querySelectorAll('.card-item').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  const res = await fetch(API + '/api/v1/admin/cards/' + cardId, { headers: headers() });
+  const d = await res.json();
+
+  let html = '<div class="detail-panel">';
+
+  // Pipeline status
+  html += '<h2>Pipeline Status</h2><div class="pipeline">';
+  html += pipelineStep('Action Plan', d.pipeline.phase1_actionPlan);
+  html += pipelineStep('Narrative', d.pipeline.phase2_narrative);
+  html += pipelineStep('Image Prompts', d.pipeline.phase3_imagePrompts);
+  html += pipelineStep('Images', d.pipeline.phase4_images);
+  html += '</div>';
+
+  // User input
+  html += '<h2>User Input</h2>';
+  html += field('Fear (original)', d.userInput.fearOriginal, 'fear');
+  html += field('Dream (original)', d.userInput.dreamOriginal, 'dream');
+
+  // Card metadata
+  html += '<h2>Card Metadata</h2>';
+  html += field('Card ID', d.cardId, 'mono');
+  html += field('Aspect', d.aspectLabel);
+  html += field('Current Stage', d.currentStage);
+  html += field('Prompt Status', d.promptStatus);
+
+  // Stage content (all 6)
+  html += '<h2>Stage Content (6 stages)</h2>';
+  for (const sc of d.stageContent) {
+    html += `<div class="stage-block">
+      <div class="stage-header">
+        <span class="stage-badge stage-${sc.stage.toLowerCase()}">${sc.stage}</span>
+        <strong>${esc(sc.title || '—')}</strong>
+      </div>`;
+    html += field('Tagline', sc.tagline);
+    html += field('Action Scene', sc.actionScene, 'action');
+    html += field('Lore', sc.lore);
+    html += field('Image Prompt', sc.imagePrompt, 'prompt mono');
+    html += '</div>';
+  }
+
+  // Images
+  html += '<h2>Generated Images</h2>';
+  if (d.images.length) {
+    html += '<div class="img-row">';
+    for (const img of d.images) {
+      html += `<div>
+        <img class="img-thumb" src="${esc(img.imageUrl)}" alt="${img.stage}" onerror="this.src=''" />
+        <div style="font-size:11px;color:#8b949e;text-align:center;margin-top:4px">${img.stage}</div>
+      </div>`;
+    }
+    html += '</div>';
+  } else {
+    html += '<div class="empty">No images generated yet.</div>';
+  }
+
+  // User info
+  if (d.user) {
+    html += '<h2>User</h2>';
+    html += field('User ID', d.user.userId, 'mono');
+    html += field('Email', d.user.email);
+    html += field('Display Name', d.user.displayName);
+    html += field('Onboarding Complete', d.user.onboardingComplete ? 'Yes' : 'No');
+  }
+
+  html += '</div>';
+  document.getElementById('card-detail').innerHTML = html;
+}
+
+async function loadUsers() {
+  const res = await fetch(API + '/api/v1/admin/users', { headers: headers() });
+  const users = await res.json();
+  const el = document.getElementById('user-list');
+  if (!users.length) { el.innerHTML = '<div class="empty">No users found.</div>'; return; }
+  el.innerHTML = '<h2>All Users</h2>' + users.map(u => `
+    <div class="user-item">
+      <div>
+        <div class="user-email">${esc(u.email || '—')}</div>
+        <div class="user-meta">${esc(u.displayName)} &bull; ${u.cardCount} cards &bull; onboarded: ${u.onboardingComplete ? 'Yes' : 'No'}</div>
+      </div>
+      <button class="secondary" onclick="document.getElementById('userId').value='${u.userId}';showTab('cards');loadCards();">View Cards</button>
+    </div>
+  `).join('');
+}
+
+function field(label, value, cls) {
+  if (!value && value !== false) value = '—';
+  return `<div class="field">
+    <div class="field-label">${label}</div>
+    <div class="field-value ${cls || ''}">${esc(String(value))}</div>
+  </div>`;
+}
+
+function pipelineStep(label, status) {
+  const done = status && status.startsWith('6/6');
+  return `<div class="pipeline-step ${done ? 'done' : 'pending'}">${label}: ${esc(status || '?')}</div>`;
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Auto-load on page open
+loadCards();
+</script>
+</body>
+</html>

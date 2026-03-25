@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+
+  <!-- Register Spring Boot's %clr color converter -->
+  <conversionRule conversionWord="clr"
+                  converterClass="org.springframework.boot.logging.logback.ColorConverter"/>
+  <conversionRule conversionWord="wex"
+                  converterClass="org.springframework.boot.logging.logback.WhitespaceThrowableProxyConverter"/>
+  <conversionRule conversionWord="wEx"
+                  converterClass="org.springframework.boot.logging.logback.ExtendedWhitespaceThrowableProxyConverter"/>
+
+  <!-- ── Properties ──────────────────────────────────────────────────────── -->
+  <springProperty scope="context" name="APP_NAME"  source="spring.application.name" defaultValue="destiny-oracle"/>
+  <springProperty scope="context" name="LOG_DIR"   source="logging.file.path"       defaultValue="logs"/>
+  <springProperty scope="context" name="LOG_LEVEL" source="logging.level.root"      defaultValue="INFO"/>
+
+  <!-- ── Color console pattern ───────────────────────────────────────────── -->
+  <!--
+      %clr(...)  = Spring Boot colorizer
+      %d         = timestamp
+      %5p        = log level (right-padded to 5 chars)
+      %t         = thread name  (shortened to 25 chars max)
+      %40logger  = logger name  (right-padded, shows last 40 chars)
+      %msg       = log message
+      %n         = newline
+  -->
+  <property name="CONSOLE_PATTERN"
+            value="%clr(%d{HH:mm:ss.SSS}){faint} %clr(%5p) %clr(%-40.40logger{39}){cyan} %clr(:){faint} %msg%n"/>
+
+  <!-- ── Plain file pattern (no ANSI codes in file) ──────────────────────── -->
+  <property name="FILE_PATTERN"
+            value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p %-40.40logger{39} : %msg%n"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!--  APPENDER 1 — Colored console                                         -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+      <pattern>${CONSOLE_PATTERN}</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!--  APPENDER 2 — Rolling file: destiny-oracle.log                        -->
+  <!--                                                                        -->
+  <!--  One log file per day, kept for 30 days, max 100 MB per file.         -->
+  <!--  "tail -f logs/destiny-oracle.log" shows live pipeline output.        -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_DIR}/destiny-oracle.log</file>
+
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <!-- archived daily: logs/destiny-oracle.2026-03-22.log.gz -->
+      <fileNamePattern>${LOG_DIR}/destiny-oracle.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+      <maxHistory>30</maxHistory>
+      <totalSizeCap>2GB</totalSizeCap>
+    </rollingPolicy>
+
+    <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+      <pattern>${FILE_PATTERN}</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!--  APPENDER 3 — Separate AI pipeline log                                -->
+  <!--                                                                        -->
+  <!--  Only captures our pipeline service classes.                           -->
+  <!--  "tail -f logs/pipeline.log" to watch generation jobs in real time.   -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <appender name="PIPELINE_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_DIR}/pipeline.log</file>
+
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <fileNamePattern>${LOG_DIR}/pipeline.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+      <maxHistory>14</maxHistory>
+      <totalSizeCap>500MB</totalSizeCap>
+    </rollingPolicy>
+
+    <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+      <pattern>${FILE_PATTERN}</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!--  LOGGER — AI pipeline classes → both main log + dedicated pipeline.log-->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <logger name="com.destinyoracle.service.impl.CardImageGenerationServiceImpl"
+          level="DEBUG" additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+    <appender-ref ref="PIPELINE_FILE"/>
+  </logger>
+
+  <logger name="com.destinyoracle.service.impl.ImagePromptServiceImpl"
+          level="DEBUG" additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+    <appender-ref ref="PIPELINE_FILE"/>
+  </logger>
+
+  <logger name="com.destinyoracle.service.impl.JobStepUpdater"
+          level="DEBUG" additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+    <appender-ref ref="PIPELINE_FILE"/>
+  </logger>
+
+  <logger name="com.destinyoracle.service.impl.GenerationJobServiceImpl"
+          level="DEBUG" additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+    <appender-ref ref="PIPELINE_FILE"/>
+  </logger>
+
+  <!-- ── Our app package (everything else) ──────────────────────────────── -->
+  <logger name="com.destinyoracle" level="DEBUG" additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </logger>
+
+  <!-- ── Spring framework: INFO only (reduces noise) ────────────────────── -->
+  <logger name="org.springframework"              level="INFO"  additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </logger>
+  <logger name="org.springframework.web.servlet"  level="WARN"  additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </logger>
+
+  <!-- ── Hibernate SQL: set to DEBUG to see all queries ─────────────────── -->
+  <!-- Change to DEBUG temporarily if you need to debug DB queries           -->
+  <logger name="org.hibernate.SQL"                 level="WARN"  additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </logger>
+  <logger name="org.hibernate.orm.jdbc.bind"       level="WARN"  additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </logger>
+  <logger name="org.hibernate.type"               level="WARN"  additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </logger>
+
+  <!-- ── HikariCP connection pool ────────────────────────────────────────── -->
+  <logger name="com.zaxxer.hikari"                level="WARN"  additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </logger>
+
+  <!-- ── Spring AI / Anthropic client ────────────────────────────────────── -->
+  <logger name="org.springframework.ai"           level="WARN"  additivity="false">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </logger>
+
+  <!-- ── Root: catch-all ─────────────────────────────────────────────────── -->
+  <root level="${LOG_LEVEL}">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </root>
+
+</configuration>
