@@ -309,15 +309,113 @@ Priority 6: Session summary              300 tokens
 Hard cap:                               4000 tokens  (never exceeded)
 ```
 
-### Docker Infrastructure (Mem0 sidecar)
+### Docker Infrastructure — Step-by-step Setup
 
-```bash
-docker compose up -d          # starts 6 containers
-docker compose exec ollama ollama pull nomic-embed-text  # one-time
-curl http://localhost:8888/   # verify Mem0 is running
+#### Prerequisites
+
+- **Docker Desktop** must be installed and running
+- Verify: `docker --version` and `docker compose version`
+- Download: https://www.docker.com/products/docker-desktop/
+
+#### Architecture (6 containers)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  destiny-oracle (Spring Boot app)  ← port 8080              │
+│       │                                                      │
+│       ├── postgres (app database)  ← port 5432               │
+│       │                                                      │
+│       └── mem0 (AI memory API)     ← port 8888               │
+│             │                                                │
+│             ├── ollama (CPU embeddings, nomic-embed-text)     │
+│             │     └── port 11434                             │
+│             ├── mem0-pgvector (vector database)               │
+│             │     └── port 8432                              │
+│             └── mem0-neo4j (graph database)                   │
+│                   └── port 7474 (web) + 7687 (bolt)          │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Containers: app, postgres, ollama (CPU embeddings), mem0, mem0-pgvector, mem0-neo4j
+#### Step 1 — Create `.env` file
+
+```bash
+cd /path/to/destiny-oracle-backend
+
+cat > .env << 'EOF'
+ANTHROPIC_API_KEY=sk-ant-...your-key-here...
+POSTGRES_PASSWORD=postgres
+MEM0_POSTGRES_PASSWORD=mem0pass
+MEM0_NEO4J_PASSWORD=mem0graph
+CORS_ORIGINS=http://localhost:4200
+EOF
+```
+
+#### Step 2 — Start infrastructure containers first
+
+```bash
+docker compose up -d ollama mem0-pgvector mem0-neo4j postgres
+```
+
+Wait ~30 seconds for health checks to pass. Check status:
+
+```bash
+docker compose ps    # all should show "healthy" or "running"
+```
+
+#### Step 3 — Pull embedding model (one-time only, ~270MB)
+
+```bash
+docker compose exec ollama ollama pull nomic-embed-text
+```
+
+#### Step 4 — Start Mem0 API server
+
+```bash
+docker compose up -d mem0
+```
+
+#### Step 5 — Verify Mem0 is running
+
+```bash
+curl http://localhost:8888/
+```
+
+Should return a JSON response from Mem0.
+
+#### Step 6 (optional) — Start the full stack including Spring Boot app
+
+```bash
+docker compose up -d    # starts all 6 containers
+```
+
+Or run Spring Boot locally (connects to Docker services):
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... \
+MEM0_BASE_URL=http://localhost:8888 \
+mvn spring-boot:run
+```
+
+#### Useful commands
+
+```bash
+docker compose ps                  # check container status
+docker compose logs -f mem0        # watch Mem0 logs
+docker compose logs -f ollama      # watch Ollama logs
+docker compose down                # stop all containers
+docker compose down -v             # stop + delete all data volumes
+docker compose restart mem0        # restart single service
+```
+
+#### Cost breakdown
+
+| Component | Cost |
+|-----------|------|
+| Docker containers (all 6) | **$0** — runs locally |
+| Ollama embeddings (nomic-embed-text) | **$0** — local model |
+| Mem0 memory operations (add/search) | **~$0.001/call** — uses Claude Haiku |
+| Chat streaming | **~$0.003/message** — uses Claude Haiku |
+| Unit tests | **$0** — no API calls |
 
 ### Unit Tests
 
