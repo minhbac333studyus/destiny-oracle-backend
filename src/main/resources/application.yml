@@ -27,13 +27,13 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   ai:
-    anthropic:
-      api-key: ${ANTHROPIC_API_KEY}   # Set your Anthropic API key; "disabled" skips AI prompt generation
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       chat:
+        model: ${OLLAMA_CHAT_MODEL:deepseek-r1:8b}   # Local LLM — $0 cost. Alt: qwen3:8b
         options:
-#          model: claude-sonnet-4-6  # Fast + affordable for prompt generation
-          model: claude-haiku-4-5-20251001  # Fast + affordable for prompt generation
-          max-tokens:  20000
+          temperature: 0.7
+          num-predict: 4096
 
 logging:
   file:

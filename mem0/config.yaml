@@ -1,9 +1,9 @@
 # mem0/config.yaml
 llm:
-  provider: "anthropic"
+  provider: "ollama"
   config:
-    model: "claude-3-5-haiku-latest"
-    api_key: "${ANTHROPIC_API_KEY}"  # reuse your existing key
+    model: "deepseek-r1:8b"
+    ollama_base_url: "http://ollama:11434"
 
 embedder:
   provider: "ollama"

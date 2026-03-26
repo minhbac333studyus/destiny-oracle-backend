@@ -83,10 +83,10 @@
       <version>${mapstruct.version}</version>
     </dependency>
 
-    <!-- Spring AI — Anthropic Claude (generates image prompts) -->
+    <!-- Spring AI — Ollama (local LLM: DeepSeek / Qwen — $0 cost) -->
     <dependency>
       <groupId>org.springframework.ai</groupId>
-      <artifactId>spring-ai-anthropic-spring-boot-starter</artifactId>
+      <artifactId>spring-ai-ollama-spring-boot-starter</artifactId>
     </dependency>
 
     <!-- Gemini image generation uses the built-in Java HttpClient (java.net.http) -->
