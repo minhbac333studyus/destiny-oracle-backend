@@ -8,9 +8,9 @@ import com.destinyoracle.repository.DestinyCardRepository;
 import com.destinyoracle.repository.GenerationJobRepository;
 import com.destinyoracle.repository.GenerationJobStepRepository;
 import com.destinyoracle.service.ImagePromptService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +21,6 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ImagePromptServiceImpl implements ImagePromptService {
 
     private final DestinyCardRepository       cardRepository;
@@ -30,6 +29,22 @@ public class ImagePromptServiceImpl implements ImagePromptService {
     private final GenerationJobStepRepository stepRepository;
     private final JobStepUpdater              stepUpdater;
     private final ChatClient.Builder          chatClientBuilder;
+
+    public ImagePromptServiceImpl(
+        DestinyCardRepository cardRepository,
+        CardStageContentRepository stageContentRepository,
+        GenerationJobRepository jobRepository,
+        GenerationJobStepRepository stepRepository,
+        JobStepUpdater stepUpdater,
+        @Qualifier("anthropicChatClient") ChatClient.Builder chatClientBuilder
+    ) {
+        this.cardRepository = cardRepository;
+        this.stageContentRepository = stageContentRepository;
+        this.jobRepository = jobRepository;
+        this.stepRepository = stepRepository;
+        this.stepUpdater = stepUpdater;
+        this.chatClientBuilder = chatClientBuilder;
+    }
 
     // ── Stage visual themes — baked into every prompt ────────────────────────
     private static final Map<CardStage, String> STAGE_MOODS = new LinkedHashMap<>();

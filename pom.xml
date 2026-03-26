@@ -83,7 +83,13 @@
       <version>${mapstruct.version}</version>
     </dependency>
 
-    <!-- Spring AI — Ollama (local LLM: DeepSeek / Qwen — $0 cost) -->
+    <!-- Spring AI — Anthropic Claude (image prompts + stage content — quality matters) -->
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-anthropic-spring-boot-starter</artifactId>
+    </dependency>
+
+    <!-- Spring AI — Ollama (chat + compression + insights — $0 cost) -->
     <dependency>
       <groupId>org.springframework.ai</groupId>
       <artifactId>spring-ai-ollama-spring-boot-starter</artifactId>

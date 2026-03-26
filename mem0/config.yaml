@@ -2,7 +2,7 @@
 llm:
   provider: "ollama"
   config:
-    model: "deepseek-r1:8b"
+    model: "qwen3:8b"
     ollama_base_url: "http://ollama:11434"
 
 embedder:

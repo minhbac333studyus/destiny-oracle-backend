@@ -7,9 +7,9 @@ import com.destinyoracle.exception.ResourceNotFoundException;
 import com.destinyoracle.repository.CardStageContentRepository;
 import com.destinyoracle.repository.DestinyCardRepository;
 import com.destinyoracle.service.StageContentGenerationService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,12 +29,21 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class StageContentGenerationServiceImpl implements StageContentGenerationService {
 
     private final DestinyCardRepository      cardRepository;
     private final CardStageContentRepository stageContentRepository;
     private final ChatClient.Builder         chatClientBuilder;
+
+    public StageContentGenerationServiceImpl(
+        DestinyCardRepository cardRepository,
+        CardStageContentRepository stageContentRepository,
+        @Qualifier("anthropicChatClient") ChatClient.Builder chatClientBuilder
+    ) {
+        this.cardRepository = cardRepository;
+        this.stageContentRepository = stageContentRepository;
+        this.chatClientBuilder = chatClientBuilder;
+    }
 
     // ── Public API ────────────────────────────────────────────────────────────
 

@@ -27,10 +27,18 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   ai:
+    # Claude — used ONLY for image prompts + stage content (quality matters)
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:disabled}
+      chat:
+        options:
+          model: claude-haiku-4-5-20251001
+          max-tokens: 20000
+    # Ollama — used for chat, compression, insights ($0 cost)
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       chat:
-        model: ${OLLAMA_CHAT_MODEL:deepseek-r1:8b}   # Local LLM — $0 cost. Alt: qwen3:8b
+        model: ${OLLAMA_CHAT_MODEL:qwen3:8b}
         options:
           temperature: 0.7
           num-predict: 4096
