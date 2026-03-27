@@ -1,302 +1,296 @@
 # Destiny Oracle — Backend
 
-Spring Boot 3.3 · Java 21 (GraalVM) · PostgreSQL · Spring AI (Claude) · Gemini Imagen 3
+> Turn self-improvement into a collectible card game with AI-powered personal coaching.
+
+Spring Boot 3.3 · Java 21 · PostgreSQL · Claude AI · Gemini Imagen 3 · Mem0 · Ollama · Docker
 
 ---
 
-## Core Concept
+## Table of Contents
 
-Each user has up to 10 **Destiny Cards** — one per life aspect (Health, Career, Finances…).
-Every card tracks a personal journey through **6 emotional stages**:
+- [What Is Destiny Oracle?](#what-is-destiny-oracle)
+- [Quick Start (New Server)](#quick-start-new-server)
+- [Manual Setup (Step by Step)](#manual-setup-step-by-step)
+- [Environment Variables](#environment-variables)
+- [API Endpoints](#api-endpoints)
+- [AI Pipeline — How Cards Are Generated](#ai-pipeline--how-cards-are-generated)
+- [AI Personal Assistant](#ai-personal-assistant)
+- [Docker Architecture](#docker-architecture)
+- [Switching AI Models](#switching-ai-models)
+- [Database Schema](#database-schema)
+- [Project Structure](#project-structure)
+- [Tech Stack](#tech-stack)
+- [Monitoring & Debugging](#monitoring--debugging)
+- [Cost Breakdown](#cost-breakdown)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## What Is Destiny Oracle?
+
+Destiny Oracle is a personal growth app that turns life goals into evolving collectible cards — powered by AI.
+
+### How it works
+
+1. **Pick a life aspect** — Health, Career, Finances, Relationships, etc. (up to 10)
+2. **Face your fear** — "I'm afraid I'll never feel healthy"
+3. **Declare your dream** — "I want to run a marathon by 40"
+4. **AI creates your card** — Claude writes a personal narrative. Gemini generates a unique card image.
+5. **Check in daily** — Complete 3 AI-generated habits. Your card evolves through 6 stages over 365 days.
+6. **Chat with your AI coach** — Get workout plans, meal plans, reminders, and daily insights.
+
+### The 6 stages
 
 ```
 Storm → Fog → Clearing → Aura → Radiance → Legend
+Day 1    Day 31   Day 91     Day 181   Day 271    Day 365
 ```
 
-The user enters their **fear** ("I'm afraid I'll never feel healthy") and their **dream**
-("I want to run a marathon by 40"). Claude turns those raw words into a full personal narrative.
+Each stage has its own card art, title, tagline, and lore — all generated from YOUR fear and dream.
+
+### Example
+
+> **Aspect:** Health & Body
+> **Fear:** "I'm terrified of dying young like my father"
+> **Dream:** "I want to run a marathon at 40"
+>
+> AI generates:
+> - **Storm** — "The Body's Betrayal" — dark, rainy card art
+> - **Clearing** — "First Light Breaking" — sunrise card art
+> - **Legend** — "The Unbreakable" — golden, triumphant card art
+>
+> Plus 3 daily habits: "30-min walk", "Drink 2L water", "No sugar after 8pm"
+
+### Two modes
+
+| Mode | What it does |
+|------|-------------|
+| **Card Mode** | Create cards, check in daily, evolve through stages, view art gallery |
+| **AI Assistant** | Chat with AI coach, get plans/tasks/reminders, earn XP, receive nudges |
 
 ---
 
-## AI Pipeline — Core Logic (Read This First)
+## Quick Start (New Server)
 
-This is the most important part of the system.
-Three AI calls happen in sequence for every card. **Order is mandatory.**
+**Prerequisites:** Docker Desktop + Java 21
 
-```
-User submits fear + dream text
-          │
-          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 1 — Stage Content Generation  (Claude)                    │
-│                                                                 │
-│  File:    service/impl/StageContentGenerationServiceImpl.java   │
-│  Trigger: AUTO on POST /api/v1/cards (card creation)           │
-│  Manual:  POST /api/v1/cards/{cardId}/generate-stage-content   │
-│  Re-gen:  POST /api/v1/cards/{cardId}/regenerate-stage-content  │
-│                                                                 │
-│  Input:  aspectLabel + fearText + dreamText                     │
-│  Claude writes 6 × {title, tagline, lore} — one per stage      │
-│  Saved:  card_stage_content (title, tagline, lore columns)      │
-│                                                                 │
-│  Example output for "Health & Body":                            │
-│    storm    → title: "The Body's Betrayal"                      │
-│               tagline: "Years of ignoring what matters most"    │
-│               lore: "You've known for a while. The warning      │
-│                      signs were there — the shortness of        │
-│                      breath, the exhaustion after one flight    │
-│                      of stairs. This is the moment of truth."   │
-│    fog      → title: "The Uncertain Step" / ...                 │
-│    clearing → title: "First Light Breaking" / ...               │
-│    aura     → title: "The Living Proof" / ...                   │
-│    radiance → title: "Marathon Body" / ...                      │
-│    legend   → title: "The Unbreakable" / ...                    │
-│                                                                 │
-│  WHY THIS IS FIRST:                                             │
-│  Step 2 reads these titles + lore as emotional context.         │
-│  Without them, image prompts are generic — not personal.        │
-└─────────────────────────────────────────────────────────────────┘
-          │
-          ▼  stage content saved to DB
-          │
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 2 — Image Prompt Generation  (Claude)                     │
-│                                                                 │
-│  File:    service/impl/ImagePromptServiceImpl.java              │
-│  Trigger: AUTO inside generate-images pipeline                  │
-│  Manual:  POST /api/v1/cards/{cardId}/generate-prompts          │
-│                                                                 │
-│  Input:  stage content (title + lore from Step 1)              │
-│  Claude writes 6 Imagen-ready text prompts — one per stage      │
-│  Saved:  card_stage_content.image_prompt column                 │
-│                                                                 │
-│  Example for storm stage:                                       │
-│    "chibi anime character, hunched figure in heavy rain,        │
-│     dark storm clouds, oppressive shadows, cinematic gloom,     │
-│     tarot card composition, ornate gold border, 4k"             │
-│                                                                 │
-│  Cost saving: if promptStatus = READY on the card,              │
-│  Claude is skipped and existing prompts are reused from DB.     │
-└─────────────────────────────────────────────────────────────────┘
-          │
-          ▼  image prompts saved to DB
-          │
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 3 — Card Image Generation  (Gemini Imagen 3)              │
-│                                                                 │
-│  File:    service/impl/CardImageGenerationServiceImpl.java      │
-│  Trigger: POST /api/v1/cards/{cardId}/generate-images           │
-│           POST /api/v1/cards/generate-images/all                │
-│                                                                 │
-│  Input:  image prompts from Step 2 + user's chibi avatar URL    │
-│  Gemini generates 6 PNG images in PARALLEL (virtual threads)    │
-│  Saved:  GCS bucket → card_images table → destiny_cards.        │
-│          image_url updated to current stage image               │
-│                                                                 │
-│  Chibi reference: if user has a chibi avatar, it's sent as      │
-│  REFERENCE_TYPE_STYLE so all 6 images share the same character. │
-│  Typical time: 30–60 seconds for all 6 images.                  │
-│                                                                 │
-│  ★ GATE: Step 3 never starts until ALL 6 prompt steps           │
-│    (Step 2) are DONE or SKIPPED.                                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Key rules
-
-| Rule | Why |
-|------|-----|
-| Step 1 before Step 2 | Image prompts use stage titles + lore as emotional context |
-| Step 2 before Step 3 | Gemini needs the text prompt to generate an image |
-| Steps are idempotent | If prompts already exist in DB, Claude is skipped (saves cost) |
-| `promptStatus` tracks Step 2 | `NONE → GENERATING → READY \| FAILED` on `destiny_cards` |
-| Regenerate resets status | `regenerate-stage-content` resets `promptStatus = NONE` so images also regenerate |
-
-### When does Step 1 run?
-
-- **Automatically** when the user adds a new card (`POST /api/v1/cards`)
-- **Manually** if it failed at creation time (`POST /{cardId}/generate-stage-content`)
-- **On re-prompt** when user edits their fear/dream (`POST /{cardId}/regenerate-stage-content`)
-
----
-
-## Job Tracking (real-time pipeline visibility)
-
-Every image generation run creates a `GenerationJob` with **12 steps** pre-built and
-visible immediately so the UI can render the full pipeline before anything starts.
-
-```
-Steps 0–5   PROMPT phase  (Claude — sequential inside one batch call)
-Steps 6–11  IMAGE  phase  (Gemini — all 6 fire in parallel)
-
-Each step: WAITING → RUNNING → DONE | SKIPPED | FAILED
-```
-
-**Poll from the frontend every 2–3 seconds:**
-```
-GET /api/v1/cards/{cardId}/jobs/latest
-```
-
-Stop polling when `job.status` is `COMPLETED` or `FAILED`.
-
-**Watch in real time (terminal):**
 ```bash
-tail -f logs/pipeline.log
+# 1. Clone
+git clone https://github.com/minhbac333studyus/destiny-oracle-backend.git
+cd destiny-oracle-backend
+
+# 2. Run the setup script (does everything)
+./scripts/setup.sh
+
+# 3. Start the app
+mvn spring-boot:run
+
+# 4. Open Swagger UI
+open http://localhost:8080/swagger-ui.html
 ```
 
----
+The setup script will:
+- Check prerequisites (Docker, Java)
+- Create `.env` with placeholders (you fill in your API key)
+- Start all Docker containers (postgres, ollama, mem0, neo4j, pgvector)
+- Pull AI models (qwen2.5:1.5b + nomic-embed-text)
+- Build and start Mem0
+- Verify everything is running
 
-## Key Files
-
-| File | Role |
-|------|------|
-| `StageContentGenerationServiceImpl.java` | **Step 1** — Claude writes title/tagline/lore for 6 stages from user's fear + dream |
-| `ImagePromptServiceImpl.java` | **Step 2** — Claude writes 6 Gemini image prompts using stage content as context |
-| `CardImageGenerationServiceImpl.java` | **Step 3** — Gemini Imagen generates 6 images in parallel; creates + updates GenerationJob |
-| `JobStepUpdater.java` | Saves step/job state in `REQUIRES_NEW` transactions (UI sees updates instantly) |
-| `CardServiceImpl.java` | `addCard()` auto-triggers Step 1 after card is created |
-| `DataInitializer.java` | Seeds 5 starter cards with pre-written content for dev/demo |
+**Safe to re-run** — skips steps already done.
 
 ---
 
-## API Endpoints
+## Manual Setup (Step by Step)
 
-### Stage Content (Step 1) — Core
+If you prefer to do it yourself instead of using `setup.sh`:
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/cards` | Add card → **auto-triggers Step 1** |
-| POST | `/api/v1/cards/{cardId}/generate-stage-content` | Manually trigger Step 1 |
-| POST | `/api/v1/cards/{cardId}/regenerate-stage-content` | Re-run Step 1 after fear/dream edit |
+### 1. Install prerequisites
 
-### Image Pipeline (Steps 2 + 3)
+- **Docker Desktop**: https://www.docker.com/products/docker-desktop/
+- **Java 21**: `brew install openjdk@21` (Mac) or https://adoptium.net
+- Verify: `docker --version` && `java -version`
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/cards/{cardId}/generate-prompts` | Step 2 only — generate image prompts |
-| POST | `/api/v1/cards/{cardId}/generate-images` | Steps 2+3 — full pipeline, all 6 stages |
-| POST | `/api/v1/cards/{cardId}/generate-images/{stage}` | Regenerate one stage image |
-| POST | `/api/v1/cards/generate-images/all` | Steps 2+3 for ALL user's aspect cards |
+### 2. Create `.env`
 
-### Job Tracking (polling)
+```bash
+cat > .env << 'EOF'
+ANTHROPIC_API_KEY=sk-ant-...your-key...
+POSTGRES_PASSWORD=postgres
+MEM0_POSTGRES_PASSWORD=mem0pass
+MEM0_NEO4J_PASSWORD=mem0graph
+CORS_ORIGINS=http://localhost:4200
+EOF
+```
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/v1/cards/{cardId}/jobs/latest` | Latest job + all 12 step statuses |
-| GET | `/api/v1/cards/{cardId}/jobs/{jobId}` | Specific job |
-| GET | `/api/v1/cards/{cardId}/jobs` | Job history |
+Get your API key at https://console.anthropic.com/settings/keys
 
-### Cards (CRUD)
+### 3. Start infrastructure
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/v1/cards` | All cards (spread view) |
-| GET | `/api/v1/cards/{cardId}` | Full card detail with stage content |
-| GET | `/api/v1/cards/aspects` | Available aspects |
-| PATCH | `/api/v1/cards/{cardId}` | Update fear/dream text |
-| DELETE | `/api/v1/cards/{cardId}` | Remove card |
-| PUT | `/api/v1/cards/{cardId}/habits/{habitId}/complete` | Toggle habit done |
+```bash
+docker compose up -d postgres ollama mem0-pgvector mem0-neo4j
+docker compose ps                                         # wait until healthy
+```
+
+### 4. Pull AI models (one-time, ~1.3GB total)
+
+```bash
+docker compose exec ollama ollama pull qwen2.5:1.5b       # Mem0 LLM
+docker compose exec ollama ollama pull nomic-embed-text    # embeddings
+```
+
+### 5. Start Mem0
+
+```bash
+docker compose up -d --build mem0
+curl http://localhost:8888/                                # verify — should respond
+```
+
+### 6. Start the app
+
+```bash
+mvn spring-boot:run
+```
+
+### 7. Start the frontend (separate terminal)
+
+```bash
+cd ../destiny-oracle
+npm install
+ng serve              # http://localhost:4200
+```
+
+> **Without API keys:** the app still runs. Card content falls back to templates.
+> Image generation returns placeholders. Add real keys to unlock the full AI pipeline.
 
 ---
 
 ## Environment Variables
 
-```bash
-# Required for Step 1 + Step 2 (Claude)
-# Get key: https://console.anthropic.com/settings/keys
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Required for Step 3 (Gemini Imagen)
-# Must have Vertex AI API enabled in GCP project
-# Auth: run `gcloud auth application-default login` locally
-GOOGLE_CLOUD_PROJECT_ID=your-gcp-project
-GOOGLE_CLOUD_LOCATION=us-central1     # default
-
-# Database
-DATABASE_URL=jdbc:postgresql://localhost:5432/destiny_oracle
-DATABASE_USERNAME=postgres
-DATABASE_PASSWORD=postgres
-
-# Optional
-GCS_BUCKET=destiny-oracle-assets      # default
-LOG_PATH=logs                          # default: logs/ next to project
-DEFAULT_USER_ID=00000000-0000-0000-0000-000000000001
-CORS_ORIGINS=http://localhost:4200
-```
-
-> **Without API keys:** the app still runs. Step 1 falls back to template content.
-> Step 3 returns placeholder image URLs. Add real keys to unlock the full pipeline.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | Yes | Claude API key for card narrative + image prompts |
+| `POSTGRES_PASSWORD` | Yes | App database password |
+| `MEM0_POSTGRES_PASSWORD` | No | Mem0 vector DB password (default: `mem0pass`) |
+| `MEM0_NEO4J_PASSWORD` | No | Mem0 graph DB password (default: `mem0graph`) |
+| `CORS_ORIGINS` | No | Allowed origins (default: `http://localhost:4200`) |
+| `GOOGLE_CLOUD_PROJECT_ID` | No | GCP project for Gemini Imagen (image generation) |
+| `GOOGLE_CLOUD_LOCATION` | No | GCP region (default: `us-central1`) |
+| `MEM0_BASE_URL` | No | Mem0 URL (default: `http://localhost:8888`) |
+| `GCS_BUCKET` | No | GCS bucket name (default: `destiny-oracle-assets`) |
 
 ---
 
-## Running Locally
+## API Endpoints
 
-```bash
-# 1. Prerequisites
-#    - Java 21 (GraalVM recommended)
-#    - PostgreSQL running with destiny_oracle database
+### Cards (core)
 
-# 2. Start with API keys
-ANTHROPIC_API_KEY=sk-ant-... \
-GOOGLE_CLOUD_PROJECT_ID=your-project \
-JAVA_HOME=/path/to/java21 \
-mvn spring-boot:run
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/cards` | All user's cards (spread view) |
+| POST | `/api/v1/cards` | Create card → auto-triggers AI generation |
+| GET | `/api/v1/cards/{id}` | Full card detail with stage content |
+| PATCH | `/api/v1/cards/{id}` | Update fear/dream text |
+| DELETE | `/api/v1/cards/{id}` | Remove card |
+| PUT | `/api/v1/cards/{id}/habits/{habitId}/complete` | Toggle daily habit |
 
-# 3. Watch pipeline logs
-tail -f logs/destiny-oracle.log   # all logs
-tail -f logs/pipeline.log         # AI pipeline steps only (Step 1→2→3)
-```
+### AI Image Pipeline
 
-**Swagger UI:** http://localhost:8080/swagger-ui.html
-**Admin Console:** open `docs/admin-test.html` in browser
-**ER Diagram:** open `docs/er-diagram.html` in browser
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/cards/{id}/generate-stage-content` | Step 1: Claude writes narrative |
+| POST | `/api/v1/cards/{id}/generate-images` | Steps 2+3: prompts + images |
+| POST | `/api/v1/cards/{id}/generate-images/{stage}` | Regenerate one stage |
+| GET | `/api/v1/cards/{id}/jobs/latest` | Poll generation progress |
+
+### AI Chat
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/chat/stream` | SSE streaming chat with AI |
+| GET | `/api/v1/chat/conversations` | List conversations |
+| GET | `/api/v1/chat/conversations/{id}` | Get conversation history |
+| DELETE | `/api/v1/chat/conversations/{id}` | Delete conversation |
+
+### Plans, Tasks, Reminders
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/plans` | List saved plans |
+| POST | `/api/v1/plans` | Save a new plan |
+| GET | `/api/v1/tasks/active` | Active tasks with steps |
+| PATCH | `/api/v1/tasks/steps/{id}/toggle` | Toggle task step |
+| GET | `/api/v1/reminders` | List reminders |
+| POST | `/api/v1/reminders` | Create reminder |
+| PATCH | `/api/v1/reminders/{id}/snooze` | Snooze reminder |
+| GET | `/api/v1/insights/today` | Today's AI insight |
+
+### Users
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/users/{id}` | Get user profile |
+| PUT | `/api/v1/users/{id}` | Update user |
+| POST | `/api/v1/users/{id}/avatar` | Upload avatar |
+| POST | `/api/v1/users/{id}/generate-chibi` | AI chibi avatar |
+
+**Full interactive docs:** http://localhost:8080/swagger-ui.html
 
 ---
 
-## Database Schema (key tables)
+## AI Pipeline — How Cards Are Generated
+
+Three AI calls happen in sequence for every card. **Order is mandatory.**
 
 ```
-destiny_cards                     — one per user per aspect
-  └── prompt_status               — NONE | GENERATING | READY | FAILED (tracks Step 2)
-
-card_stage_content                — 6 rows per card (one per stage)
-  ├── title                       — written by Step 1 (Claude, from fear+dream)
-  ├── tagline                     — written by Step 1
-  ├── lore                        — written by Step 1
-  └── image_prompt                — written by Step 2 (Claude, from title+lore)
-
-card_images                       — permanent gallery (one per generated image)
-  ├── image_url                   — GCS URL written by Step 3 (Gemini)
-  └── prompt_summary              — first 200 chars of image prompt used
-
-generation_jobs                   — one per pipeline run
-  └── status                      — QUEUED | PROMPTING | IMAGING | COMPLETED | FAILED
-
-generation_job_steps              — 12 rows per job (6 PROMPT + 6 IMAGE)
-  ├── phase                       — PROMPT | IMAGE
-  ├── stage                       — storm | fog | clearing | aura | radiance | legend
-  ├── status                      — WAITING | RUNNING | DONE | FAILED | SKIPPED
-  └── message                     — human-readable status shown in the UI
+User submits fear + dream
+        │
+        ▼
+  ┌──────────────────────────────────────────┐
+  │  STEP 1 — Stage Content (Claude)         │
+  │  fear + dream → 6x {title, tagline, lore}│
+  │  Auto-runs on card creation              │
+  └──────────────────────────────────────────┘
+        │
+        ▼
+  ┌──────────────────────────────────────────┐
+  │  STEP 2 — Image Prompts (Claude)         │
+  │  title + lore → 6 Imagen-ready prompts   │
+  │  Skipped if prompts already exist in DB  │
+  └──────────────────────────────────────────┘
+        │
+        ▼
+  ┌──────────────────────────────────────────┐
+  │  STEP 3 — Card Images (Gemini Imagen 3)  │
+  │  6 images generated in PARALLEL          │
+  │  Saved to GCS → card_images table        │
+  └──────────────────────────────────────────┘
 ```
+
+**Key rules:**
+- Step 1 before 2 (prompts need narrative context to be personal)
+- Step 2 before 3 (Gemini needs text prompt)
+- All steps are idempotent (re-running skips already-done work)
+- Frontend polls `GET /api/v1/cards/{id}/jobs/latest` every 2-3s for progress
+
+**Pipeline creates a `GenerationJob` with 12 steps** (6 prompt + 6 image). Each step goes through `WAITING → RUNNING → DONE | FAILED | SKIPPED`.
 
 ---
 
-## AI Personal Assistant (new)
+## AI Personal Assistant
 
-The backend now includes a full AI personal assistant that transforms the app from a card creator into a daily-use AI coach.
+Beyond card creation, the app includes a full AI coach:
 
-### 6 New Features
+| Feature | How it works |
+|---------|-------------|
+| **AI Chat** | SSE streaming with Claude. 4-layer context assembly with 4000-token cap. Mem0 stores long-term memories. |
+| **Saved Plans** | AI creates workout/meal/routine plans. Saved with versioning and slug lookup. |
+| **Tasks + XP** | Plans become tasks with toggleable steps. Completing steps awards XP → cards evolve faster. |
+| **Reminders** | Smart reminders with daily/weekly/monthly repeat and snooze. |
+| **Nudge Engine** | If you miss a scheduled plan, the app escalates: gentle → firm → urgent (every 5 min check). |
+| **Daily Insights** | AI generates a daily summary at 11 PM. Morning push at 8 AM. |
 
-| Feature | Description | Endpoints |
-|---------|-------------|-----------|
-| **AI Chat** | SSE streaming chat with Claude, 4-layer context assembly (4000-token cap), Mem0 long-term memory | `/api/v1/chat/*` |
-| **Saved Plans** | Persistent workout/meal/routine plans with versioning and slug lookup | `/api/v1/plans/*` |
-| **Tasks + XP** | AI-generated tasks with step toggles, XP awards tied to Destiny Card progression | `/api/v1/tasks/*` |
-| **Reminders** | Smart reminders with repeat (daily/weekly/monthly) and snooze | `/api/v1/reminders/*` |
-| **Nudge Engine** | Proactive 3-level escalation nudges for scheduled plans | Scheduler (every 5 min) |
-| **Daily Insights** | AI-generated daily summaries with morning push notifications | `/api/v1/insights/*` |
-
-### Memory Architecture
+### Memory architecture
 
 ```
 Priority 1: System prompt               300 tokens
@@ -309,263 +303,202 @@ Priority 6: Session summary              300 tokens
 Hard cap:                               4000 tokens  (never exceeded)
 ```
 
-### Docker Infrastructure — Step-by-step Setup
-
-#### Prerequisites
-
-- **Docker Desktop** must be installed and running
-- Verify: `docker --version` and `docker compose version`
-- Download: https://www.docker.com/products/docker-desktop/
-
-#### Architecture (6 containers)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  destiny-oracle (Spring Boot app)  ← port 8080              │
-│       │                                                      │
-│       ├── postgres (app database)  ← port 5432               │
-│       │                                                      │
-│       └── mem0 (AI memory API)     ← port 8888               │
-│             │                                                │
-│             ├── ollama (CPU embeddings, nomic-embed-text)     │
-│             │     └── port 11434                             │
-│             ├── mem0-pgvector (vector database)               │
-│             │     └── port 8432                              │
-│             └── mem0-neo4j (graph database)                   │
-│                   └── port 7474 (web) + 7687 (bolt)          │
-└─────────────────────────────────────────────────────────────┘
-```
-
-#### Step 1 — Create `.env` file
-
-```bash
-cd /path/to/destiny-oracle-backend
-
-cat > .env << 'EOF'
-ANTHROPIC_API_KEY=sk-ant-...your-key-here...
-POSTGRES_PASSWORD=postgres
-MEM0_POSTGRES_PASSWORD=mem0pass
-MEM0_NEO4J_PASSWORD=mem0graph
-CORS_ORIGINS=http://localhost:4200
-EOF
-```
-
-#### Step 2 — Start infrastructure containers first
-
-```bash
-docker compose up -d ollama mem0-pgvector mem0-neo4j postgres
-```
-
-Wait ~30 seconds for health checks to pass. Check status:
-
-```bash
-docker compose ps    # all should show "healthy" or "running"
-```
-
-#### Step 3 — Pull AI models (one-time only)
-
-```bash
-docker compose exec ollama ollama pull qwen2.5:1.5b       # Mem0 LLM (~1GB)
-docker compose exec ollama ollama pull nomic-embed-text    # Embeddings (~270MB)
-```
-
-#### Step 4 — Start Mem0 API server
-
-```bash
-docker compose up -d --build mem0
-```
-
-#### Step 5 — Verify Mem0 is running
-
-```bash
-curl http://localhost:8888/        # should redirect to /docs
-```
-
-Test add + search memory:
-
-```bash
-# Add a memory
-curl -X POST http://localhost:8888/v1/memories/ \
-  -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"I go to the gym 5 days a week"}],"user_id":"test-user"}'
-
-# Search memories
-curl -X POST http://localhost:8888/v1/memories/search/ \
-  -H "Content-Type: application/json" \
-  -d '{"query":"workout schedule","user_id":"test-user"}'
-
-# List all memories for a user
-curl http://localhost:8888/v1/memories/?user_id=test-user
-```
-
-#### Step 6 (optional) — Start the full stack including Spring Boot app
-
-```bash
-docker compose up -d    # starts all 6 containers
-```
-
-Or run Spring Boot locally (connects to Docker services):
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-... \
-MEM0_BASE_URL=http://localhost:8888 \
-mvn spring-boot:run
-```
-
-#### Useful commands
-
-```bash
-docker compose ps                  # check container status
-docker compose logs -f mem0        # watch Mem0 logs
-docker compose logs -f ollama      # watch Ollama logs
-docker compose down                # stop all containers
-docker compose down -v             # stop + delete all data volumes
-docker compose restart mem0        # restart single service
-docker stats                       # monitor RAM/CPU usage
-```
-
-#### Monitoring
-
-| Tool | URL | What it shows |
-|------|-----|---------------|
-| **Neo4j Browser** | http://localhost:7474 | Graph memory visualization (login: `neo4j` / `mem0graph`) |
-| **Mem0 Swagger** | http://localhost:8888/docs | API docs + test endpoints |
-| **Anthropic Console** | https://console.anthropic.com/settings/usage | Claude API usage & costs |
-
-#### Cost breakdown
-
-| Component | Cost |
-|-----------|------|
-| Docker containers (all 6) | **$0** — runs locally |
-| Ollama LLM (qwen2.5:1.5b) | **$0** — local model |
-| Ollama embeddings (nomic-embed-text) | **$0** — local model |
-| Mem0 memory operations (add/search) | **$0** — uses Ollama locally |
-| Image prompt generation (Claude Haiku) | **~$0.001/call** — Anthropic API |
-| Stage content generation (Claude Haiku) | **~$0.003/call** — Anthropic API |
-| Unit tests | **$0** — no API calls |
+Mem0 runs locally via Ollama (qwen2.5:1.5b) — **$0 cost** for memory operations.
 
 ---
 
-### Switching AI Models
+## Docker Architecture
 
-All AI model configuration is centralized. Here's how to change models in the future.
+6 containers, one command:
 
-#### Mem0 LLM (summarization & fact extraction)
-
-**File:** `mem0/main.py` — change `LLM_MODEL` default, or set env var.
-
-```bash
-# Option A: Change default in mem0/main.py
-LLM_MODEL = os.environ.get("LLM_MODEL", "qwen2.5:1.5b")  # ← change here
-
-# Option B: Set env var in docker-compose.yml under mem0 service
-environment:
-  - LLM_MODEL=llama3:8b
+```
+┌─────────────────────────────────────────────────────────────┐
+│  destiny-oracle (Spring Boot)        ← port 8080            │
+│       │                                                      │
+│       ├── postgres (app database)    ← port 5432             │
+│       │                                                      │
+│       └── mem0 (AI memory API)       ← port 8888             │
+│             │                                                │
+│             ├── ollama (local LLM + embeddings)               │
+│             │     └── port 11434                              │
+│             ├── mem0-pgvector (vector store)                   │
+│             │     └── port 8432                               │
+│             └── mem0-neo4j (graph store)                       │
+│                   └── port 7474 (web) + 7687 (bolt)           │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Available local models (pull first with `docker compose exec ollama ollama pull <model>`):
+### Common commands
 
-| Model | RAM needed | Quality | Speed |
-|-------|-----------|---------|-------|
+```bash
+docker compose up -d                   # start everything
+docker compose down                    # stop everything
+docker compose down -v                 # stop + delete all data
+docker compose ps                      # check status
+docker compose logs -f mem0            # watch mem0 logs
+docker compose restart mem0            # restart one service
+docker stats                           # monitor RAM/CPU
+```
+
+---
+
+## Switching AI Models
+
+All AI config is centralized. Here's how to change any model.
+
+### Mem0 LLM (summarization & fact extraction)
+
+**File:** `mem0/main.py` — change `LLM_MODEL`, or set env var in `docker-compose.yml`
+
+```python
+LLM_MODEL = os.environ.get("LLM_MODEL", "qwen2.5:1.5b")  # ← change default here
+```
+
+| Model | RAM | Quality | Speed |
+|-------|-----|---------|-------|
 | `qwen2.5:0.5b` | ~0.5GB | ⭐⭐ | Very fast |
-| `qwen2.5:1.5b` | ~1.5GB | ⭐⭐⭐ | Fast (current) |
+| **`qwen2.5:1.5b`** | ~1.5GB | ⭐⭐⭐ | Fast (current) |
 | `qwen2.5:3b` | ~2.5GB | ⭐⭐⭐⭐ | Medium |
 | `llama3.2:3b` | ~2.5GB | ⭐⭐⭐⭐ | Medium |
 | `qwen2.5:7b` | ~5GB | ⭐⭐⭐⭐⭐ | Slow |
-| `deepseek-r1:8b` | ~5.5GB | ⭐⭐⭐⭐⭐ | Slow (has thinking) |
 
-After changing, rebuild:
+After changing:
 
 ```bash
-docker compose exec ollama ollama pull <new-model>   # download model
-docker compose up -d --build mem0                     # restart mem0
-docker compose logs mem0 --tail 5                     # verify
+docker compose exec ollama ollama pull <new-model>
+docker compose up -d --build mem0
 ```
 
-#### Mem0 Embeddings
+### Mem0 Embeddings
 
-**File:** `mem0/main.py` — change `EMBED_MODEL` default.
+**File:** `mem0/main.py` — change `EMBED_MODEL`
 
 | Model | Size | Quality |
 |-------|------|---------|
-| `nomic-embed-text` | 270MB | ⭐⭐⭐⭐ (current, recommended) |
-| `all-minilm` | 80MB | ⭐⭐⭐ (smaller, faster) |
-| `mxbai-embed-large` | 670MB | ⭐⭐⭐⭐⭐ (best quality) |
+| **`nomic-embed-text`** | 270MB | ⭐⭐⭐⭐ (current) |
+| `all-minilm` | 80MB | ⭐⭐⭐ (lighter) |
+| `mxbai-embed-large` | 670MB | ⭐⭐⭐⭐⭐ (best) |
 
-> **Warning:** Changing embedding model after memories are stored will make old memories unsearchable. Delete old memories first: `curl -X DELETE http://localhost:8888/v1/memories/?user_id=<id>`
+> **Warning:** Changing embeddings after memories are stored makes old memories unsearchable.
 
-#### Image Prompts & Stage Content (Claude)
+### Card Generation (Claude)
 
-**File:** `src/main/resources/application.yml` — under `spring.ai.anthropic`
+**File:** `src/main/resources/application.yml`
 
 ```yaml
-spring:
-  ai:
-    anthropic:
-      chat:
-        options:
-          model: claude-3-5-haiku-latest    # ← change here
+spring.ai.anthropic.chat.options.model: claude-3-5-haiku-latest  # ← change here
 ```
 
-Options: `claude-3-5-haiku-latest` (cheap), `claude-3-5-sonnet-latest` (better), `claude-3-opus-latest` (best)
+Options: `claude-3-5-haiku-latest` (cheap) · `claude-3-5-sonnet-latest` (better) · `claude-3-opus-latest` (best)
 
-#### Using an API provider instead of local Ollama
+### Switch Mem0 to cloud API (instead of local Ollama)
 
-To switch Mem0 from local Ollama to a cloud API (e.g., DeepSeek, OpenAI):
-
-**File:** `mem0/main.py` — change the `llm` section in `DEFAULT_CONFIG`:
+**File:** `mem0/main.py` — change `DEFAULT_CONFIG["llm"]`:
 
 ```python
-# DeepSeek API ($0.14/M input tokens — very cheap)
+# DeepSeek API ($0.14/M tokens)
 "llm": {
-    "provider": "openai",   # DeepSeek is OpenAI-compatible
+    "provider": "openai",
     "config": {
         "api_key": os.environ.get("DEEPSEEK_API_KEY"),
         "model": "deepseek-chat",
         "api_base": "https://api.deepseek.com/v1",
     },
 },
-
-# OpenAI
-"llm": {
-    "provider": "openai",
-    "config": {
-        "api_key": os.environ.get("OPENAI_API_KEY"),
-        "model": "gpt-4o-mini",
-    },
-},
-
-# Anthropic Claude
-"llm": {
-    "provider": "anthropic",
-    "config": {
-        "api_key": os.environ.get("ANTHROPIC_API_KEY"),
-        "model": "claude-3-5-haiku-latest",
-    },
-},
 ```
 
-Add the API key to `.env` and `docker-compose.yml` environment section, then rebuild mem0.
-
-### Unit Tests
-
-```bash
-mvn test -Dtest="com.destinyoracle.unit.**"   # 38 tests, all free ($0)
-```
+Add the key to `.env` and docker-compose `environment`, then `docker compose up -d --build mem0`.
 
 ---
 
-## Archive / Chapter System (planned)
+## Database Schema
 
-When a user completes a milestone (e.g. 365-day streak) and wants to continue the same
-aspect with a new fear/dream:
+```
+destiny_cards                     — one per user per aspect
+  └── prompt_status               — NONE | GENERATING | READY | FAILED
 
-1. Old card → `status = ARCHIVED` (images **kept** in gallery permanently)
-2. `card_stage_content.image_prompt` → **cleared** (prompts belonged to the old fear)
-3. `card_stage_content` title/tagline/lore → **kept** (earned history, not erased)
-4. New card created for same aspect with `chapter_number + 1` and new fear/dream
-5. Step 1 runs again → fresh narrative arc written from the new input
-6. Steps 2+3 run → new images generated for the new chapter
+card_stage_content                — 6 rows per card (one per stage)
+  ├── title, tagline, lore        — written by Step 1 (Claude)
+  └── image_prompt                — written by Step 2 (Claude)
+
+card_images                       — permanent gallery
+  ├── image_url                   — GCS URL (Step 3)
+  └── prompt_summary              — first 200 chars of prompt
+
+generation_jobs                   — one per pipeline run
+generation_job_steps              — 12 rows per job (6 PROMPT + 6 IMAGE)
+
+ai_conversations / ai_messages    — chat history
+conversation_memory               — compressed summaries
+daily_insight                     — AI-generated daily summaries
+
+saved_plan / plan_schedule        — workout/meal/routine plans
+task / task_step                  — tasks with toggleable steps
+reminder                          — smart reminders with repeat
+nudge_state                       — escalation tracking
+device_token                      — push notification tokens
+```
+
+Schema is auto-managed by Hibernate (`ddl-auto: update`). No migration files needed.
+
+---
+
+## Project Structure
+
+```
+destiny-oracle-backend/
+├── scripts/
+│   └── setup.sh                          ★ One-command setup
+├── mem0/
+│   ├── Dockerfile                        Mem0 container build
+│   ├── main.py                           Custom Mem0 server (Ollama config)
+│   └── config.yaml                       Mem0 model config
+├── docker-compose.yml                    6-container orchestration
+│
+├── src/main/java/com/destinyoracle/
+│   ├── controller/
+│   │   ├── CardController                Card CRUD + stage content
+│   │   ├── CardImageGenerationController Image pipeline + job polling
+│   │   ├── AiChatController              SSE streaming chat
+│   │   ├── SavedPlanController           Plan CRUD
+│   │   ├── TaskController                Tasks + step toggles
+│   │   ├── ReminderController            Reminders CRUD
+│   │   ├── InsightController             Daily insights
+│   │   └── DeviceController              Push notification tokens
+│   │
+│   ├── service/impl/
+│   │   ├── StageContentGenerationServiceImpl  ★ Step 1 — fear+dream → narrative
+│   │   ├── ImagePromptServiceImpl             ★ Step 2 — narrative → image prompts
+│   │   ├── CardImageGenerationServiceImpl     ★ Step 3 — prompts → images
+│   │   ├── AiChatServiceImpl                  Chat with context assembly
+│   │   ├── SavedPlanServiceImpl               Plan management
+│   │   ├── TaskServiceImpl                    Task + XP system
+│   │   └── ReminderServiceImpl                Reminder scheduling
+│   │
+│   ├── domain/
+│   │   ├── chat/        AiConversation, AiMessage, DailyInsight
+│   │   ├── plan/        SavedPlan, PlanSchedule, NudgeState
+│   │   ├── task/        Task, TaskStep
+│   │   └── notification/ DeviceToken, Reminder
+│   │
+│   ├── scheduler/
+│   │   ├── NudgeScheduler              Proactive nudges (every 5 min)
+│   │   ├── ReminderScheduler           Reminder notifications
+│   │   ├── InsightScheduler            Daily insight generation (11 PM)
+│   │   └── StageProgressionScheduler   Card stage advancement
+│   │
+│   ├── shared/
+│   │   ├── ai/          IntentClassifier, ConversationCompressor
+│   │   ├── context/     ContextAssembler, TokenCounter
+│   │   ├── event/       Spring events (TaskCompleted, StageAdvanced)
+│   │   └── xp/          XpCalculator
+│   │
+│   └── integration/
+│       └── Mem0Client                   HTTP client for Mem0 API
+│
+└── src/main/resources/
+    └── application.yml                  All Spring + AI config
+```
 
 ---
 
@@ -573,44 +506,61 @@ aspect with a new fear/dream:
 
 | Layer | Technology |
 |-------|-----------|
-| Language | Java 21 (LTS, virtual threads) |
+| Language | Java 21 (virtual threads) |
 | Framework | Spring Boot 3.3.4 |
 | Database | PostgreSQL 15+ |
-| Schema | Hibernate `ddl-auto: update` (no migration files) |
 | ORM | Spring Data JPA / Hibernate |
-| Boilerplate | Lombok |
-| AI — Stage Content | Spring AI + Anthropic Claude (`claude-3-5-haiku`) |
-| AI — Image Prompts | Spring AI + Anthropic Claude (`claude-3-5-haiku`) |
+| AI — Narrative | Spring AI + Anthropic Claude (Haiku) |
 | AI — Images | Google Vertex AI — Gemini Imagen 3 |
-| Image Storage | Google Cloud Storage (GCS) |
+| AI — Memory | Mem0 + Ollama (qwen2.5:1.5b) |
+| AI — Embeddings | Ollama (nomic-embed-text) |
+| Graph Store | Neo4j 5 |
+| Vector Store | pgvector |
 | API Docs | SpringDoc OpenAPI 3 (Swagger UI) |
 | Build | Maven |
 
 ---
 
-## Architecture
+## Monitoring & Debugging
 
-```
-destiny-oracle-backend/
-├── controller/
-│   ├── CardController                  CRUD + stage content endpoints
-│   └── CardImageGenerationController   Image pipeline + job polling
-│
-├── service/impl/
-│   ├── StageContentGenerationServiceImpl  ★ Step 1 — fear+dream → narrative
-│   ├── ImagePromptServiceImpl             ★ Step 2 — narrative → image prompts
-│   ├── CardImageGenerationServiceImpl     ★ Step 3 — prompts → images (parallel)
-│   ├── JobStepUpdater                     Persists job step transitions (REQUIRES_NEW)
-│   ├── GenerationJobServiceImpl           Job polling response builder
-│   └── CardServiceImpl                    Card CRUD, triggers Step 1 on addCard()
-│
-├── entity/
-│   ├── DestinyCard                     promptStatus tracks Step 2 state
-│   ├── CardStageContent                title/tagline/lore (Step 1) + image_prompt (Step 2)
-│   ├── CardImage                       generated image URL + prompt summary (Step 3)
-│   ├── GenerationJob                   pipeline run with 12 steps
-│   └── GenerationJobStep               individual step with WAITING→DONE lifecycle
-│
-└── seeder/
-    └── DataInitializer                 Seeds 5 demo cards with pre-written content
-```
+| Tool | URL / Command | What it shows |
+|------|---------------|---------------|
+| **Swagger UI** | http://localhost:8080/swagger-ui.html | Interactive API docs |
+| **Mem0 Docs** | http://localhost:8888/docs | Mem0 API explorer |
+| **Neo4j Browser** | http://localhost:7474 | Memory graph (login: `neo4j`/`mem0graph`) |
+| **Pipeline logs** | `tail -f logs/pipeline.log` | AI generation steps in real-time |
+| **Mem0 logs** | `docker compose logs -f mem0` | Memory operations |
+| **Ollama logs** | `docker compose logs -f ollama` | Model loading + inference |
+| **Container stats** | `docker stats` | RAM/CPU per container |
+| **Claude usage** | https://console.anthropic.com/settings/usage | API costs |
+
+---
+
+## Cost Breakdown
+
+| Component | Cost | Notes |
+|-----------|------|-------|
+| Docker containers (all 6) | **$0** | Runs locally |
+| Ollama LLM (qwen2.5:1.5b) | **$0** | Local model |
+| Ollama embeddings (nomic-embed-text) | **$0** | Local model |
+| Mem0 memory operations | **$0** | Uses local Ollama |
+| Card narrative (Claude Haiku) | **~$0.003/card** | 1 API call per card |
+| Image prompts (Claude Haiku) | **~$0.001/card** | 1 API call per card |
+| Card images (Gemini Imagen 3) | **~$0.04/card** | 6 images per card |
+| Unit tests | **$0** | No API calls |
+| **Typical monthly (active user)** | **~$1-3/mo** | 10 cards + daily chat |
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `Cannot connect to Docker daemon` | Open Docker Desktop first |
+| `model requires more system memory` | Use a smaller model: `qwen2.5:1.5b` instead of `8b` |
+| `Empty reply from server` (mem0) | Check `docker compose logs mem0` — usually missing `ollama` pip package |
+| `OPENAI_API_KEY not set` (mem0) | Mem0 not reading custom `main.py` — run `docker compose up -d --build mem0` |
+| `GOOGLE_CLOUD_PROJECT_ID warning` | Harmless warning, ignore it. Add `GOOGLE_CLOUD_PROJECT_ID=unused` to `.env` to silence |
+| Mem0 slow (10+ seconds) | Normal for small CPU. Mem0 runs async — user doesn't wait |
+| `Port already in use` | `docker compose down` first, then restart |
+| Java version mismatch | Need Java 21+: `brew install openjdk@21` |
