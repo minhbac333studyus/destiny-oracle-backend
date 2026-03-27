@@ -362,25 +362,41 @@ Wait ~30 seconds for health checks to pass. Check status:
 docker compose ps    # all should show "healthy" or "running"
 ```
 
-#### Step 3 — Pull embedding model (one-time only, ~270MB)
+#### Step 3 — Pull AI models (one-time only)
 
 ```bash
-docker compose exec ollama ollama pull nomic-embed-text
+docker compose exec ollama ollama pull qwen2.5:1.5b       # Mem0 LLM (~1GB)
+docker compose exec ollama ollama pull nomic-embed-text    # Embeddings (~270MB)
 ```
 
 #### Step 4 — Start Mem0 API server
 
 ```bash
-docker compose up -d mem0
+docker compose up -d --build mem0
 ```
 
 #### Step 5 — Verify Mem0 is running
 
 ```bash
-curl http://localhost:8888/
+curl http://localhost:8888/        # should redirect to /docs
 ```
 
-Should return a JSON response from Mem0.
+Test add + search memory:
+
+```bash
+# Add a memory
+curl -X POST http://localhost:8888/v1/memories/ \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"I go to the gym 5 days a week"}],"user_id":"test-user"}'
+
+# Search memories
+curl -X POST http://localhost:8888/v1/memories/search/ \
+  -H "Content-Type: application/json" \
+  -d '{"query":"workout schedule","user_id":"test-user"}'
+
+# List all memories for a user
+curl http://localhost:8888/v1/memories/?user_id=test-user
+```
 
 #### Step 6 (optional) — Start the full stack including Spring Boot app
 
@@ -405,17 +421,131 @@ docker compose logs -f ollama      # watch Ollama logs
 docker compose down                # stop all containers
 docker compose down -v             # stop + delete all data volumes
 docker compose restart mem0        # restart single service
+docker stats                       # monitor RAM/CPU usage
 ```
+
+#### Monitoring
+
+| Tool | URL | What it shows |
+|------|-----|---------------|
+| **Neo4j Browser** | http://localhost:7474 | Graph memory visualization (login: `neo4j` / `mem0graph`) |
+| **Mem0 Swagger** | http://localhost:8888/docs | API docs + test endpoints |
+| **Anthropic Console** | https://console.anthropic.com/settings/usage | Claude API usage & costs |
 
 #### Cost breakdown
 
 | Component | Cost |
 |-----------|------|
 | Docker containers (all 6) | **$0** — runs locally |
+| Ollama LLM (qwen2.5:1.5b) | **$0** — local model |
 | Ollama embeddings (nomic-embed-text) | **$0** — local model |
-| Mem0 memory operations (add/search) | **~$0.001/call** — uses Claude Haiku |
-| Chat streaming | **~$0.003/message** — uses Claude Haiku |
+| Mem0 memory operations (add/search) | **$0** — uses Ollama locally |
+| Image prompt generation (Claude Haiku) | **~$0.001/call** — Anthropic API |
+| Stage content generation (Claude Haiku) | **~$0.003/call** — Anthropic API |
 | Unit tests | **$0** — no API calls |
+
+---
+
+### Switching AI Models
+
+All AI model configuration is centralized. Here's how to change models in the future.
+
+#### Mem0 LLM (summarization & fact extraction)
+
+**File:** `mem0/main.py` — change `LLM_MODEL` default, or set env var.
+
+```bash
+# Option A: Change default in mem0/main.py
+LLM_MODEL = os.environ.get("LLM_MODEL", "qwen2.5:1.5b")  # ← change here
+
+# Option B: Set env var in docker-compose.yml under mem0 service
+environment:
+  - LLM_MODEL=llama3:8b
+```
+
+Available local models (pull first with `docker compose exec ollama ollama pull <model>`):
+
+| Model | RAM needed | Quality | Speed |
+|-------|-----------|---------|-------|
+| `qwen2.5:0.5b` | ~0.5GB | ⭐⭐ | Very fast |
+| `qwen2.5:1.5b` | ~1.5GB | ⭐⭐⭐ | Fast (current) |
+| `qwen2.5:3b` | ~2.5GB | ⭐⭐⭐⭐ | Medium |
+| `llama3.2:3b` | ~2.5GB | ⭐⭐⭐⭐ | Medium |
+| `qwen2.5:7b` | ~5GB | ⭐⭐⭐⭐⭐ | Slow |
+| `deepseek-r1:8b` | ~5.5GB | ⭐⭐⭐⭐⭐ | Slow (has thinking) |
+
+After changing, rebuild:
+
+```bash
+docker compose exec ollama ollama pull <new-model>   # download model
+docker compose up -d --build mem0                     # restart mem0
+docker compose logs mem0 --tail 5                     # verify
+```
+
+#### Mem0 Embeddings
+
+**File:** `mem0/main.py` — change `EMBED_MODEL` default.
+
+| Model | Size | Quality |
+|-------|------|---------|
+| `nomic-embed-text` | 270MB | ⭐⭐⭐⭐ (current, recommended) |
+| `all-minilm` | 80MB | ⭐⭐⭐ (smaller, faster) |
+| `mxbai-embed-large` | 670MB | ⭐⭐⭐⭐⭐ (best quality) |
+
+> **Warning:** Changing embedding model after memories are stored will make old memories unsearchable. Delete old memories first: `curl -X DELETE http://localhost:8888/v1/memories/?user_id=<id>`
+
+#### Image Prompts & Stage Content (Claude)
+
+**File:** `src/main/resources/application.yml` — under `spring.ai.anthropic`
+
+```yaml
+spring:
+  ai:
+    anthropic:
+      chat:
+        options:
+          model: claude-3-5-haiku-latest    # ← change here
+```
+
+Options: `claude-3-5-haiku-latest` (cheap), `claude-3-5-sonnet-latest` (better), `claude-3-opus-latest` (best)
+
+#### Using an API provider instead of local Ollama
+
+To switch Mem0 from local Ollama to a cloud API (e.g., DeepSeek, OpenAI):
+
+**File:** `mem0/main.py` — change the `llm` section in `DEFAULT_CONFIG`:
+
+```python
+# DeepSeek API ($0.14/M input tokens — very cheap)
+"llm": {
+    "provider": "openai",   # DeepSeek is OpenAI-compatible
+    "config": {
+        "api_key": os.environ.get("DEEPSEEK_API_KEY"),
+        "model": "deepseek-chat",
+        "api_base": "https://api.deepseek.com/v1",
+    },
+},
+
+# OpenAI
+"llm": {
+    "provider": "openai",
+    "config": {
+        "api_key": os.environ.get("OPENAI_API_KEY"),
+        "model": "gpt-4o-mini",
+    },
+},
+
+# Anthropic Claude
+"llm": {
+    "provider": "anthropic",
+    "config": {
+        "api_key": os.environ.get("ANTHROPIC_API_KEY"),
+        "model": "claude-3-5-haiku-latest",
+    },
+},
+```
+
+Add the API key to `.env` and `docker-compose.yml` environment section, then rebuild mem0.
 
 ### Unit Tests
 

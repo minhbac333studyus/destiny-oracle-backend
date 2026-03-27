@@ -4,4 +4,6 @@ RUN pip install --no-cache-dir \
     "mem0ai[graph]" \
     rank-bm25 \
     langchain-neo4j \
-    neo4j
+    neo4j \
+    ollama
+COPY main.py /app/main.py
