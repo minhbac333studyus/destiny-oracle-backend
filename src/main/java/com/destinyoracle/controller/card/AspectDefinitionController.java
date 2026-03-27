@@ -1,4 +1,4 @@
-package com.destinyoracle.controller;
+package com.destinyoracle.controller.card;
 
 import com.destinyoracle.dto.request.UpdateAspectDefinitionRequest;
 import com.destinyoracle.dto.response.ApiResponse;

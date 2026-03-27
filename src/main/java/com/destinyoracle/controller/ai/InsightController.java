@@ -1,4 +1,4 @@
-package com.destinyoracle.controller;
+package com.destinyoracle.controller.ai;
 
 import com.destinyoracle.domain.chat.entity.DailyInsight;
 import com.destinyoracle.domain.chat.repository.DailyInsightRepository;

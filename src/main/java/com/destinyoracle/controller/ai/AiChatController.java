@@ -1,4 +1,4 @@
-package com.destinyoracle.controller;
+package com.destinyoracle.controller.ai;
 
 import com.destinyoracle.dto.request.ChatMessageRequest;
 import com.destinyoracle.dto.response.ConversationResponse;

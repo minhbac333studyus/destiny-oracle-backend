@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Destiny Oracle — System Monitor</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, system-ui, sans-serif; background: #0c1028; color: #f5f0ff; min-height: 100vh; }
+  .header { background: rgba(20,24,56,0.9); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 1.2rem; background: linear-gradient(135deg, #5ecfff, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .auto-refresh { font-size: 0.8rem; color: #6b7280; }
+  .refresh-btn { background: rgba(94,207,255,0.15); border: 1px solid rgba(94,207,255,0.3); color: #5ecfff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+  .refresh-btn:hover { background: rgba(94,207,255,0.25); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; padding: 20px; max-width: 1400px; margin: 0 auto; }
+
+  .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .card-title { font-size: 0.95rem; font-weight: 600; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .status-dot.up { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+  .status-dot.down { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+  .status-dot.loading { background: #ffb347; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: 0.5; } }
+
+  .metric-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.85rem; }
+  .metric-row:last-child { border: none; }
+  .metric-label { color: #9ca3af; }
+  .metric-value { color: #f5f0ff; font-weight: 500; }
+  .metric-value.green { color: #22c55e; }
+  .metric-value.red { color: #ef4444; }
+  .metric-value.yellow { color: #ffb347; }
+  .metric-value.cyan { color: #5ecfff; }
+
+  .logs-section { grid-column: 1 / -1; }
+  .log-area { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; max-height: 300px; overflow-y: auto; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.75rem; line-height: 1.6; color: #9ca3af; }
+  .log-line { white-space: pre-wrap; word-break: break-all; }
+  .log-line.error { color: #ef4444; }
+  .log-line.warn { color: #ffb347; }
+  .log-line.info { color: #5ecfff; }
+
+  .test-section { display: flex; gap: 8px; margin-top: 12px; }
+  .test-btn { background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.3); color: #a855f7; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; }
+  .test-btn:hover { background: rgba(168,85,247,0.25); }
+  .test-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .result-box { margin-top: 8px; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; font-size: 0.8rem; max-height: 200px; overflow-y: auto; display: none; }
+  .result-box.show { display: block; }
+
+  .full-width { grid-column: 1 / -1; }
+  .two-col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+  .tag.running { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .tag.stopped { background: rgba(239,68,68,0.15); color: #ef4444; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔮 Destiny Oracle — System Monitor</h1>
+  <div class="header-right">
+    <span class="auto-refresh" id="lastUpdate">Loading...</span>
+    <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- Spring Boot Backend -->
+  <div class="card" id="card-backend">
+    <div class="card-header">
+      <span class="card-title">🖥 Spring Boot Backend</span>
+      <span class="status-dot loading" id="dot-backend"></span>
+    </div>
+    <div id="metrics-backend">
+      <div class="metric-row"><span class="metric-label">Status</span><span class="metric-value" id="v-backend-status">checking...</span></div>
+      <div class="metric-row"><span class="metric-label">URL</span><span class="metric-value cyan">localhost:8080</span></div>
+      <div class="metric-row"><span class="metric-label">Swagger</span><span class="metric-value"><a href="/swagger-ui.html" target="_blank" style="color:#5ecfff">Open →</a></span></div>
+      <div class="metric-row"><span class="metric-label">Response Time</span><span class="metric-value" id="v-backend-latency">—</span></div>
+    </div>
+  </div>
+
+  <!-- PostgreSQL -->
+  <div class="card" id="card-postgres">
+    <div class="card-header">
+      <span class="card-title">🗄 PostgreSQL (App DB)</span>
+      <span class="status-dot loading" id="dot-postgres"></span>
+    </div>
+    <div id="metrics-postgres">
+      <div class="metric-row"><span class="metric-label">Status</span><span class="metric-value" id="v-pg-status">checking...</span></div>
+      <div class="metric-row"><span class="metric-label">Port</span><span class="metric-value cyan">5432</span></div>
+      <div class="metric-row"><span class="metric-label">Cards</span><span class="metric-value" id="v-pg-cards">—</span></div>
+      <div class="metric-row"><span class="metric-label">Users</span><span class="metric-value" id="v-pg-users">—</span></div>
+      <div class="metric-row"><span class="metric-label">Conversations</span><span class="metric-value" id="v-pg-convos">—</span></div>
+    </div>
+  </div>
+
+  <!-- Mem0 API -->
+  <div class="card" id="card-mem0">
+    <div class="card-header">
+      <span class="card-title">🧠 Mem0 (AI Memory)</span>
+      <span class="status-dot loading" id="dot-mem0"></span>
+    </div>
+    <div id="metrics-mem0">
+      <div class="metric-row"><span class="metric-label">Status</span><span class="metric-value" id="v-mem0-status">checking...</span></div>
+      <div class="metric-row"><span class="metric-label">URL</span><span class="metric-value cyan">localhost:8888</span></div>
+      <div class="metric-row"><span class="metric-label">Docs</span><span class="metric-value"><a href="http://localhost:8888/docs" target="_blank" style="color:#5ecfff">Open →</a></span></div>
+      <div class="metric-row"><span class="metric-label">Response Time</span><span class="metric-value" id="v-mem0-latency">—</span></div>
+    </div>
+    <div class="test-section">
+      <button class="test-btn" onclick="testMem0Add()">+ Test Add Memory</button>
+      <button class="test-btn" onclick="testMem0Search()">🔍 Test Search</button>
+      <button class="test-btn" onclick="listMem0Memories()">📋 List Memories</button>
+    </div>
+    <div class="result-box" id="mem0-result"></div>
+  </div>
+
+  <!-- Ollama -->
+  <div class="card" id="card-ollama">
+    <div class="card-header">
+      <span class="card-title">🤖 Ollama (Local AI)</span>
+      <span class="status-dot loading" id="dot-ollama"></span>
+    </div>
+    <div id="metrics-ollama">
+      <div class="metric-row"><span class="metric-label">Status</span><span class="metric-value" id="v-ollama-status">checking...</span></div>
+      <div class="metric-row"><span class="metric-label">URL</span><span class="metric-value cyan">localhost:11434</span></div>
+      <div class="metric-row"><span class="metric-label">Models Loaded</span><span class="metric-value" id="v-ollama-models">—</span></div>
+    </div>
+    <div id="ollama-model-list" style="margin-top:8px"></div>
+    <div class="test-section">
+      <button class="test-btn" onclick="testOllamaGenerate()">💬 Test Generate</button>
+    </div>
+    <div class="result-box" id="ollama-result"></div>
+  </div>
+
+  <!-- Neo4j -->
+  <div class="card" id="card-neo4j">
+    <div class="card-header">
+      <span class="card-title">🕸 Neo4j (Graph DB)</span>
+      <span class="status-dot loading" id="dot-neo4j"></span>
+    </div>
+    <div id="metrics-neo4j">
+      <div class="metric-row"><span class="metric-label">Status</span><span class="metric-value" id="v-neo4j-status">checking...</span></div>
+      <div class="metric-row"><span class="metric-label">Web UI</span><span class="metric-value"><a href="http://localhost:7474" target="_blank" style="color:#5ecfff">localhost:7474 →</a></span></div>
+      <div class="metric-row"><span class="metric-label">Bolt Port</span><span class="metric-value cyan">7687</span></div>
+    </div>
+  </div>
+
+  <!-- pgvector -->
+  <div class="card" id="card-pgvector">
+    <div class="card-header">
+      <span class="card-title">📐 pgvector (Vector DB)</span>
+      <span class="status-dot loading" id="dot-pgvector"></span>
+    </div>
+    <div id="metrics-pgvector">
+      <div class="metric-row"><span class="metric-label">Status</span><span class="metric-value" id="v-pgvector-status">checking...</span></div>
+      <div class="metric-row"><span class="metric-label">Port</span><span class="metric-value cyan">8432</span></div>
+      <div class="metric-row"><span class="metric-label">Used by</span><span class="metric-value">Mem0 embeddings</span></div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="card full-width">
+    <div class="card-header">
+      <span class="card-title">⚡ Quick Actions</span>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="test-btn" onclick="healthCheckAll()">🏥 Health Check All</button>
+      <button class="test-btn" onclick="testChatStream()">💬 Test Chat Stream</button>
+      <button class="test-btn" onclick="window.open('/swagger-ui.html','_blank')">📖 Swagger UI</button>
+      <button class="test-btn" onclick="window.open('http://localhost:8888/docs','_blank')">🧠 Mem0 Docs</button>
+      <button class="test-btn" onclick="window.open('http://localhost:7474','_blank')">🕸 Neo4j Browser</button>
+    </div>
+    <div class="result-box" id="action-result"></div>
+  </div>
+
+  <!-- Logs -->
+  <div class="card logs-section">
+    <div class="card-header">
+      <span class="card-title">📋 Activity Log</span>
+      <button class="refresh-btn" onclick="document.getElementById('log-area').innerHTML='';" style="font-size:0.7rem; padding:4px 10px;">Clear</button>
+    </div>
+    <div class="log-area" id="log-area"></div>
+  </div>
+</div>
+
+<script>
+const LOG = document.getElementById('log-area');
+
+function log(msg, level = 'info') {
+  const time = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.className = `log-line ${level}`;
+  div.textContent = `[${time}] ${msg}`;
+  LOG.prepend(div);
+  if (LOG.children.length > 200) LOG.removeChild(LOG.lastChild);
+}
+
+function setDot(id, status) {
+  const dot = document.getElementById(id);
+  dot.className = `status-dot ${status}`;
+}
+
+function setVal(id, text, cls = '') {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = `metric-value ${cls}`;
+}
+
+async function checkBackend() {
+  try {
+    const start = Date.now();
+    const res = await fetch('/api/v1/cards', { headers: { 'X-User-Id': 'monitor' } });
+    const latency = Date.now() - start;
+    if (res.ok) {
+      setDot('dot-backend', 'up');
+      setVal('v-backend-status', 'Running', 'green');
+      setVal('v-backend-latency', `${latency}ms`, latency < 500 ? 'green' : 'yellow');
+      log('Backend: OK (' + latency + 'ms)');
+    } else {
+      setDot('dot-backend', 'down');
+      setVal('v-backend-status', `Error ${res.status}`, 'red');
+      log('Backend: HTTP ' + res.status, 'error');
+    }
+  } catch (e) {
+    setDot('dot-backend', 'down');
+    setVal('v-backend-status', 'Offline', 'red');
+    setVal('v-backend-latency', '—');
+    log('Backend: Offline — ' + e.message, 'error');
+  }
+}
+
+async function checkPostgres() {
+  try {
+    const res = await fetch('/api/v1/monitor/db-stats');
+    if (res.ok) {
+      const data = await res.json();
+      setDot('dot-postgres', 'up');
+      setVal('v-pg-status', 'Connected', 'green');
+      setVal('v-pg-cards', data.cards ?? '—', 'cyan');
+      setVal('v-pg-users', data.users ?? '—', 'cyan');
+      setVal('v-pg-convos', data.conversations ?? '—', 'cyan');
+      log('PostgreSQL: OK (cards=' + (data.cards ?? 0) + ', users=' + (data.users ?? 0) + ')');
+    } else {
+      setDot('dot-postgres', 'up');
+      setVal('v-pg-status', 'Running (no stats endpoint)', 'yellow');
+      log('PostgreSQL: Running but /monitor/db-stats not available', 'warn');
+    }
+  } catch {
+    setDot('dot-postgres', 'up');
+    setVal('v-pg-status', 'Assumed running (via backend)', 'yellow');
+  }
+}
+
+async function checkMem0() {
+  try {
+    const start = Date.now();
+    const res = await fetch('http://localhost:8888/');
+    const latency = Date.now() - start;
+    setDot('dot-mem0', res.ok ? 'up' : 'down');
+    setVal('v-mem0-status', res.ok ? 'Running' : 'Error', res.ok ? 'green' : 'red');
+    setVal('v-mem0-latency', `${latency}ms`, latency < 1000 ? 'green' : 'yellow');
+    log('Mem0: ' + (res.ok ? 'OK' : 'Error') + ' (' + latency + 'ms)');
+  } catch (e) {
+    setDot('dot-mem0', 'down');
+    setVal('v-mem0-status', 'Offline', 'red');
+    setVal('v-mem0-latency', '—');
+    log('Mem0: Offline — ' + e.message, 'error');
+  }
+}
+
+async function checkOllama() {
+  try {
+    const res = await fetch('http://localhost:11434/api/tags');
+    if (res.ok) {
+      const data = await res.json();
+      const models = data.models || [];
+      setDot('dot-ollama', 'up');
+      setVal('v-ollama-status', 'Running', 'green');
+      setVal('v-ollama-models', models.length.toString(), 'cyan');
+
+      const list = document.getElementById('ollama-model-list');
+      list.innerHTML = models.map(m => {
+        const sizeMB = (m.size / 1024 / 1024).toFixed(0);
+        return `<div class="metric-row"><span class="metric-label">${m.name}</span><span class="metric-value cyan">${sizeMB} MB</span></div>`;
+      }).join('');
+
+      log('Ollama: OK (' + models.length + ' models: ' + models.map(m => m.name).join(', ') + ')');
+    }
+  } catch (e) {
+    setDot('dot-ollama', 'down');
+    setVal('v-ollama-status', 'Offline', 'red');
+    log('Ollama: Offline — ' + e.message, 'error');
+  }
+}
+
+async function checkNeo4j() {
+  try {
+    const res = await fetch('http://localhost:7474/');
+    setDot('dot-neo4j', res.ok ? 'up' : 'down');
+    setVal('v-neo4j-status', res.ok ? 'Running' : 'Error', res.ok ? 'green' : 'red');
+    log('Neo4j: ' + (res.ok ? 'OK' : 'Error'));
+  } catch (e) {
+    setDot('dot-neo4j', 'down');
+    setVal('v-neo4j-status', 'Offline', 'red');
+    log('Neo4j: Offline', 'error');
+  }
+}
+
+async function checkPgvector() {
+  // pgvector is reachable only from Docker network, check via Mem0
+  const mem0Up = document.getElementById('dot-mem0').classList.contains('up');
+  if (mem0Up) {
+    setDot('dot-pgvector', 'up');
+    setVal('v-pgvector-status', 'Running (via Mem0)', 'green');
+  } else {
+    setDot('dot-pgvector', 'loading');
+    setVal('v-pgvector-status', 'Unknown (Mem0 offline)', 'yellow');
+  }
+}
+
+// ── Test Functions ──
+
+async function testMem0Add() {
+  const box = document.getElementById('mem0-result');
+  box.classList.add('show');
+  box.textContent = 'Adding test memory...';
+  log('Mem0: Testing add memory...');
+  try {
+    const res = await fetch('http://localhost:8888/v1/memories/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'Monitor test: I prefer morning workouts at 6am' }], user_id: 'monitor-test' })
+    });
+    const data = await res.json();
+    box.textContent = JSON.stringify(data, null, 2);
+    log('Mem0 add: Success', 'info');
+  } catch (e) {
+    box.textContent = 'Error: ' + e.message;
+    log('Mem0 add: Failed — ' + e.message, 'error');
+  }
+}
+
+async function testMem0Search() {
+  const box = document.getElementById('mem0-result');
+  box.classList.add('show');
+  box.textContent = 'Searching memories...';
+  log('Mem0: Testing search...');
+  try {
+    const res = await fetch('http://localhost:8888/v1/memories/search/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'workout schedule', user_id: 'monitor-test' })
+    });
+    const data = await res.json();
+    box.textContent = JSON.stringify(data, null, 2);
+    log('Mem0 search: ' + (data.results?.length || 0) + ' results');
+  } catch (e) {
+    box.textContent = 'Error: ' + e.message;
+    log('Mem0 search: Failed', 'error');
+  }
+}
+
+async function listMem0Memories() {
+  const box = document.getElementById('mem0-result');
+  box.classList.add('show');
+  box.textContent = 'Loading memories...';
+  try {
+    const res = await fetch('http://localhost:8888/v1/memories/?user_id=monitor-test');
+    const data = await res.json();
+    box.textContent = JSON.stringify(data, null, 2);
+    log('Mem0 list: ' + (data.results?.length || data.length || 0) + ' memories');
+  } catch (e) {
+    box.textContent = 'Error: ' + e.message;
+    log('Mem0 list: Failed', 'error');
+  }
+}
+
+async function testOllamaGenerate() {
+  const box = document.getElementById('ollama-result');
+  box.classList.add('show');
+  box.textContent = 'Generating with qwen2.5:1.5b...';
+  log('Ollama: Testing generate...');
+  const start = Date.now();
+  try {
+    const res = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'qwen2.5:1.5b', prompt: 'Say hello in one sentence.', stream: false })
+    });
+    const data = await res.json();
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    box.textContent = `Response (${elapsed}s):\n${data.response}\n\nTokens: ${data.eval_count || '?'} | Speed: ${elapsed}s`;
+    log('Ollama generate: OK (' + elapsed + 's)');
+  } catch (e) {
+    box.textContent = 'Error: ' + e.message;
+    log('Ollama generate: Failed', 'error');
+  }
+}
+
+async function testChatStream() {
+  const box = document.getElementById('action-result');
+  box.classList.add('show');
+  box.textContent = 'Testing chat stream...';
+  log('Chat: Testing SSE stream...');
+  try {
+    const res = await fetch('/api/v1/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': 'monitor-test' },
+      body: JSON.stringify({ message: 'Say hi in 5 words' })
+    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      full += decoder.decode(value, { stream: true });
+      box.textContent = 'Stream response:\n' + full;
+    }
+    log('Chat stream: OK');
+  } catch (e) {
+    box.textContent = 'Error: ' + e.message;
+    log('Chat stream: Failed — ' + e.message, 'error');
+  }
+}
+
+async function healthCheckAll() {
+  const box = document.getElementById('action-result');
+  box.classList.add('show');
+  box.textContent = 'Running health checks...';
+  await refreshAll();
+  const checks = [
+    { name: 'Backend', dot: 'dot-backend' },
+    { name: 'Mem0', dot: 'dot-mem0' },
+    { name: 'Ollama', dot: 'dot-ollama' },
+    { name: 'Neo4j', dot: 'dot-neo4j' },
+    { name: 'pgvector', dot: 'dot-pgvector' },
+  ];
+  const results = checks.map(c => {
+    const status = document.getElementById(c.dot).classList.contains('up') ? '✅' : '❌';
+    return `${status} ${c.name}`;
+  });
+  box.textContent = results.join('\n');
+}
+
+async function refreshAll() {
+  log('─── Refreshing all services ───');
+  await Promise.all([checkBackend(), checkMem0(), checkOllama(), checkNeo4j()]);
+  await checkPostgres();
+  await checkPgvector();
+  document.getElementById('lastUpdate').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+}
+
+// Auto-refresh every 30s
+refreshAll();
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>

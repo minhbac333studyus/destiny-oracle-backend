@@ -1,4 +1,4 @@
-package com.destinyoracle.controller;
+package com.destinyoracle.controller.card;
 
 import com.destinyoracle.config.AppProperties;
 import com.destinyoracle.dto.response.*;
