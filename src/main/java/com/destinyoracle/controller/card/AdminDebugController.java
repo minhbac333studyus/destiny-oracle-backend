@@ -3,6 +3,7 @@ package com.destinyoracle.controller.card;
 import com.destinyoracle.config.AppProperties;
 import com.destinyoracle.entity.*;
 import com.destinyoracle.repository.*;
+import com.destinyoracle.service.SystemHealthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,17 @@ public class AdminDebugController {
     private final CardImageRepository        cardImageRepository;
     private final UserRepository             userRepository;
     private final AppProperties              appProperties;
+    private final SystemHealthService        systemHealthService;
+
+    // ── System health ─────────────────────────────────────────────────────
+
+    @GetMapping("/system-health")
+    @Operation(summary = "Aggregated health check for all backend services",
+               description = "Probes Oracle backend, PostgreSQL, Ollama, Mem0, pgvector, Neo4j, " +
+                             "Claude API, and image provider. Returns status and key metrics.")
+    public ResponseEntity<Map<String, Object>> getSystemHealth() {
+        return ResponseEntity.ok(systemHealthService.getFullHealth());
+    }
 
     // ── Full card dump ──────────────────────────────────────────────────────
 

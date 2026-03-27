@@ -103,11 +103,11 @@ public class DestinyCard {
     private Instant updatedAt;
 
     // ── XP / Stage Progression (AI Assistant extension) ───
-    @Column(name = "current_xp", nullable = false)
+    @Column(name = "current_xp")
     @Builder.Default
     private Integer currentXp = 0;
 
-    @Column(name = "xp_to_next_stage", nullable = false)
+    @Column(name = "xp_to_next_stage")
     @Builder.Default
     private Integer xpToNextStage = 100;
 

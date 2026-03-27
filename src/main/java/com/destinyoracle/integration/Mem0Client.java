@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -27,16 +28,11 @@ public class Mem0Client {
     private final RestClient restClient;
 
     /** Primary constructor for Spring injection. */
+    @Autowired
     public Mem0Client(
-        @Value("${mem0.base-url:http://localhost:8888}") String baseUrl,
-        RestClient.Builder builder
+        @Value("${mem0.base-url:http://localhost:8888}") String baseUrl
     ) {
-        this.restClient = builder.baseUrl(baseUrl).build();
-    }
-
-    /** Test-friendly constructor (reversed param order). */
-    public Mem0Client(RestClient.Builder builder, String baseUrl) {
-        this.restClient = builder.baseUrl(baseUrl).build();
+        this.restClient = RestClient.builder().baseUrl(baseUrl).build();
     }
 
     /** Constructor accepting a pre-built RestClient (for tests with WireMock). */
