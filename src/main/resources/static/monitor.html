@@ -55,6 +55,18 @@
   .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
   .tag.running { background: rgba(34,197,94,0.15); color: #22c55e; }
   .tag.stopped { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+  .routing-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 8px; }
+  .routing-table th { text-align: left; color: #6b7280; font-weight: 500; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .routing-table td { padding: 8px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+  .routing-table tr:last-child td { border: none; }
+  .provider-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+  .provider-badge.anthropic { background: rgba(168,85,247,0.2); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
+  .provider-badge.ollama    { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+  .provider-badge.fixed     { background: rgba(255,255,255,0.06); color: #6b7280; }
+  .switch-btn { padding: 3px 10px; border-radius: 5px; font-size: 0.72rem; cursor: pointer; border: 1px solid rgba(94,207,255,0.3); background: rgba(94,207,255,0.1); color: #5ecfff; }
+  .switch-btn:hover { background: rgba(94,207,255,0.2); }
+  .switch-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -107,7 +119,9 @@
       <div class="metric-row"><span class="metric-label">Status</span><span class="metric-value" id="v-mem0-status">checking...</span></div>
       <div class="metric-row"><span class="metric-label">URL</span><span class="metric-value cyan">localhost:8888</span></div>
       <div class="metric-row"><span class="metric-label">Docs</span><span class="metric-value"><a href="http://localhost:8888/docs" target="_blank" style="color:#5ecfff">Open →</a></span></div>
-      <div class="metric-row"><span class="metric-label">Response Time</span><span class="metric-value" id="v-mem0-latency">—</span></div>
+      <div class="metric-row"><span class="metric-label">Ping</span><span class="metric-value" id="v-mem0-latency">—</span></div>
+      <div class="metric-row"><span class="metric-label">Search Probe</span><span class="metric-value" id="v-mem0-probe">—</span></div>
+      <div class="metric-row" id="mem0-error-row" style="display:none"><span class="metric-label">Error</span><span class="metric-value" id="v-mem0-error" style="color:#fb7185;font-weight:600;white-space:normal;word-break:break-word">—</span></div>
     </div>
     <div class="test-section">
       <button class="test-btn" onclick="testMem0Add()">+ Test Add Memory</button>
@@ -161,6 +175,28 @@
     </div>
   </div>
 
+  <!-- AI Routing -->
+  <div class="card full-width">
+    <div class="card-header">
+      <span class="card-title">🧠 AI Model Routing</span>
+      <button class="refresh-btn" onclick="loadAiRouting()">↻ Refresh</button>
+    </div>
+    <table class="routing-table">
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Provider</th>
+          <th>Model</th>
+          <th>Switch</th>
+        </tr>
+      </thead>
+      <tbody id="routing-tbody">
+        <tr><td colspan="4" style="color:#6b7280;padding:12px 8px">Loading...</td></tr>
+      </tbody>
+    </table>
+    <div class="result-box" id="routing-result"></div>
+  </div>
+
   <!-- Quick Actions -->
   <div class="card full-width">
     <div class="card-header">
@@ -212,7 +248,7 @@ function setVal(id, text, cls = '') {
 async function checkBackend() {
   try {
     const start = Date.now();
-    const res = await fetch('/api/v1/cards', { headers: { 'X-User-Id': 'monitor' } });
+    const res = await fetch('/api/v1/cards', { headers: { 'X-User-Id': '00000000-0000-0000-0000-000000000001' } });
     const latency = Date.now() - start;
     if (res.ok) {
       setDot('dot-backend', 'up');
@@ -255,18 +291,51 @@ async function checkPostgres() {
 }
 
 async function checkMem0() {
+  const errorRow = document.getElementById('mem0-error-row');
+  errorRow.style.display = 'none';
   try {
+    // Step 1: Ping
     const start = Date.now();
     const res = await fetch('http://localhost:8888/');
     const latency = Date.now() - start;
-    setDot('dot-mem0', res.ok ? 'up' : 'down');
-    setVal('v-mem0-status', res.ok ? 'Running' : 'Error', res.ok ? 'green' : 'red');
     setVal('v-mem0-latency', `${latency}ms`, latency < 1000 ? 'green' : 'yellow');
-    log('Mem0: ' + (res.ok ? 'OK' : 'Error') + ' (' + latency + 'ms)');
+
+    if (!res.ok) {
+      setDot('dot-mem0', 'down');
+      setVal('v-mem0-status', 'Error', 'red');
+      setVal('v-mem0-probe', 'Skipped', 'yellow');
+      return;
+    }
+
+    // Step 2: Functional probe — POST /v1/memories/search/
+    const t1 = Date.now();
+    const probeRes = await fetch('http://localhost:8888/v1/memories/search/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'health-check', user_id: 'monitor-probe', limit: 1 }),
+    });
+    const probeMs = Date.now() - t1;
+
+    if (probeRes.ok) {
+      setDot('dot-mem0', 'up');
+      setVal('v-mem0-status', 'Healthy', 'green');
+      setVal('v-mem0-probe', `OK (${probeMs}ms)`, 'green');
+      log('Mem0: Healthy — ping ' + latency + 'ms, search probe ' + probeMs + 'ms');
+    } else {
+      const errBody = await probeRes.json().catch(() => ({}));
+      const errMsg = errBody.detail || `HTTP ${probeRes.status}`;
+      setDot('dot-mem0', 'down');
+      setVal('v-mem0-status', 'Degraded', 'red');
+      setVal('v-mem0-probe', 'FAILED', 'red');
+      setVal('v-mem0-error', errMsg);
+      errorRow.style.display = '';
+      log('Mem0: Degraded — ' + errMsg, 'error');
+    }
   } catch (e) {
     setDot('dot-mem0', 'down');
     setVal('v-mem0-status', 'Offline', 'red');
     setVal('v-mem0-latency', '—');
+    setVal('v-mem0-probe', '—');
     log('Mem0: Offline — ' + e.message, 'error');
   }
 }
@@ -407,7 +476,7 @@ async function testChatStream() {
   try {
     const res = await fetch('/api/v1/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-User-Id': 'monitor-test' },
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': '00000000-0000-0000-0000-000000000001' },
       body: JSON.stringify({ message: 'Say hi in 5 words' })
     });
     const reader = res.body.getReader();
@@ -445,9 +514,71 @@ async function healthCheckAll() {
   box.textContent = results.join('\n');
 }
 
+async function loadAiRouting() {
+  try {
+    const res = await fetch('/api/v1/monitor/ai-routing');
+    const data = await res.json();
+    const tbody = document.getElementById('routing-tbody');
+    const rows = [];
+
+    // Switchable services
+    for (const [key, s] of Object.entries(data.services)) {
+      const isClaude = s.provider === 'anthropic';
+      const otherProvider = isClaude ? 'ollama' : 'anthropic';
+      const otherLabel    = isClaude ? 'Switch to Ollama' : 'Switch to Claude';
+      rows.push(`
+        <tr>
+          <td style="color:#f5f0ff">${s.service}</td>
+          <td><span class="provider-badge ${s.provider}">${isClaude ? '⚡ Claude' : '🤖 Ollama'}</span></td>
+          <td style="color:#5ecfff;font-size:0.78rem">${s.model}</td>
+          <td><button class="switch-btn" onclick="switchProvider('${key}','${otherProvider}',this)">${otherLabel}</button></td>
+        </tr>`);
+    }
+
+    // Fixed services
+    for (const [key, s] of Object.entries(data.fixed)) {
+      rows.push(`
+        <tr>
+          <td style="color:#9ca3af">${s.service}</td>
+          <td><span class="provider-badge fixed">⚡ Claude (fixed)</span></td>
+          <td style="color:#6b7280;font-size:0.78rem">${data.anthropicModel}</td>
+          <td><button class="switch-btn" disabled>Fixed</button></td>
+        </tr>`);
+    }
+
+    tbody.innerHTML = rows.join('');
+  } catch (e) {
+    document.getElementById('routing-tbody').innerHTML =
+      `<tr><td colspan="4" style="color:#ef4444">Failed to load: ${e.message}</td></tr>`;
+  }
+}
+
+async function switchProvider(service, provider, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Switching...';
+  const resultBox = document.getElementById('routing-result');
+  resultBox.classList.add('show');
+  try {
+    const res = await fetch('/api/v1/monitor/ai-routing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service, provider })
+    });
+    const data = await res.json();
+    resultBox.textContent = `✅ ${data.updated} → ${data.provider} (${data.model})`;
+    resultBox.style.color = '#22c55e';
+    log(`AI routing: ${data.updated} switched to ${data.provider} (${data.model})`, 'info');
+    await loadAiRouting();
+  } catch (e) {
+    resultBox.textContent = `❌ Switch failed: ${e.message}`;
+    resultBox.style.color = '#ef4444';
+    btn.disabled = false;
+  }
+}
+
 async function refreshAll() {
   log('─── Refreshing all services ───');
-  await Promise.all([checkBackend(), checkMem0(), checkOllama(), checkNeo4j()]);
+  await Promise.all([checkBackend(), checkMem0(), checkOllama(), checkNeo4j(), loadAiRouting()]);
   await checkPostgres();
   await checkPgvector();
   document.getElementById('lastUpdate').textContent = 'Last updated: ' + new Date().toLocaleTimeString();

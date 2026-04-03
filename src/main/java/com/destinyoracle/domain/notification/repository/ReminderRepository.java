@@ -2,6 +2,7 @@ package com.destinyoracle.domain.notification.repository;
 
 import com.destinyoracle.domain.notification.entity.Reminder;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -52,4 +53,11 @@ public interface ReminderRepository extends JpaRepository<Reminder, UUID> {
         AND r.notificationSent = true
         """)
     int countActiveUnseen(@Param("userId") UUID userId);
+
+    /**
+     * Delete completed reminders older than the given cutoff.
+     */
+    @Modifying
+    @Query("DELETE FROM Reminder r WHERE r.completed = true AND r.scheduledAt < :cutoff")
+    int deleteCompletedBefore(@Param("cutoff") LocalDateTime cutoff);
 }

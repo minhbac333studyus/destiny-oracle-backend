@@ -2,7 +2,7 @@ package com.destinyoracle.scheduler;
 
 import com.destinyoracle.domain.notification.entity.Reminder;
 import com.destinyoracle.domain.notification.repository.ReminderRepository;
-import com.destinyoracle.service.PushNotificationService;
+import com.destinyoracle.domain.notification.service.PushNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -53,6 +53,17 @@ public class ReminderScheduler {
 
         if (!dueReminders.isEmpty()) {
             log.info("Processed {} due reminders", dueReminders.size());
+        }
+    }
+
+    /** Daily at 2 AM: delete completed reminders older than 24 hours. */
+    @Scheduled(cron = "0 0 2 * * *")
+    @Transactional
+    public void cleanupCompletedReminders() {
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
+        int deleted = reminderRepo.deleteCompletedBefore(cutoff);
+        if (deleted > 0) {
+            log.info("Cleaned up {} completed reminders older than 24h", deleted);
         }
     }
 }

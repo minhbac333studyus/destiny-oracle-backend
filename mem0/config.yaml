@@ -1,15 +1,17 @@
 # mem0/config.yaml
+# LLM: Claude Haiku (fast, ~$0.002/message for Mem0 internal calls)
+# Embedder: Ollama nomic-embed-text (free, local)
 llm:
-  provider: "ollama"
+  provider: "anthropic"
   config:
-    model: "qwen2.5:1.5b"
-    ollama_base_url: "http://ollama:11434"
+    model: "claude-haiku-4-5-20251001"
+    temperature: 0.2
 
 embedder:
   provider: "ollama"
   config:
     model: "nomic-embed-text"
-    ollama_base_url: "http://ollama:11434"  # Docker service name
+    ollama_base_url: "http://ollama:11434"
 
 vector_store:
   provider: "pgvector"

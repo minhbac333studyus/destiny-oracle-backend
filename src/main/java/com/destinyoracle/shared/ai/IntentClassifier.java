@@ -21,11 +21,11 @@ public class IntentClassifier {
     }
 
     private static final Pattern REMINDER_PATTERN = Pattern.compile(
-        "(?i)(remind|reminder|alarm|notify|notification|alert)\\b.*\\b(me|at|in|every|tomorrow|today)"
+        "(?i)(remind|reminder|alarm|notify|notification|alert|set.*reminder|set.*reminders)\\b.*\\b(me|at|in|every|tomorrow|today|AM|PM|\\d{1,2}:\\d{2})"
     );
 
     private static final Pattern TASK_PATTERN = Pattern.compile(
-        "(?i)(create|make|give|build|generate|design)\\b.*\\b(plan|workout|routine|exercise|meal|task|list|schedule)"
+        "(?i)(create|make|give|build|generate|design|plan|help me plan|prep|checklist|organize|track)\\b.*\\b(plan|workout|routine|exercise|meal|task|list|schedule|for today|for this week|today's|meals|supplements|steps)"
     );
 
     private static final Pattern PLAN_SAVE_PATTERN = Pattern.compile(
@@ -40,6 +40,16 @@ public class IntentClassifier {
         "(?i)(how was|summary|daily|today's|yesterday's)\\b.*\\b(day|summary|insight|review|progress)"
     );
 
+    /** Quick keyword check for Blueprint-style prompts that are too long for regex. */
+    private static boolean containsActionKeywords(String msg) {
+        String lower = msg.toLowerCase();
+        return (lower.contains("plan") && (lower.contains("meal") || lower.contains("workout") || lower.contains("exercise")))
+            || (lower.contains("reminder") && (lower.contains("set") || lower.contains("create")))
+            || lower.contains("give me") && (lower.contains("plan") || lower.contains("routine"))
+            || lower.contains("help me plan")
+            || lower.contains("for today") && (lower.contains("plan") || lower.contains("meal") || lower.contains("workout"));
+    }
+
     public Intent classify(String message) {
         if (message == null || message.isBlank()) return Intent.GENERAL;
 
@@ -48,6 +58,9 @@ public class IntentClassifier {
         if (PLAN_QUERY_PATTERN.matcher(message).find()) return Intent.PLAN_QUERY;
         if (TASK_PATTERN.matcher(message).find()) return Intent.TASK;
         if (INSIGHT_PATTERN.matcher(message).find()) return Intent.INSIGHT;
+
+        // Fallback: catch long prompts (e.g. Blueprint) with action-oriented keywords
+        if (containsActionKeywords(message)) return Intent.TASK;
 
         return Intent.GENERAL;
     }

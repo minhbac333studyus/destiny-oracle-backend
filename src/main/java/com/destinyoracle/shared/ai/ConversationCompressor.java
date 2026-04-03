@@ -46,6 +46,7 @@ public class ConversationCompressor {
      * Check if compression is needed and run it async.
      */
     @Async
+    @Transactional
     public void compressIfNeeded(UUID conversationId) {
         try {
             long uncompressedCount = messageRepo.countUncompressed(conversationId);
@@ -62,9 +63,11 @@ public class ConversationCompressor {
         List<AiMessage> candidates = messageRepo.findCompressCandidates(conversationId, KEEP_RECENT);
         if (candidates.isEmpty()) return;
 
-        // Build text for compression
+        // Build text for compression (pre-truncate long messages to save tokens)
         String conversationText = candidates.stream()
-            .map(m -> m.getRole() + ": " + m.getContent())
+            .map(m -> m.getRole() + ": " + (m.getContent().length() > 300
+                ? m.getContent().substring(0, 300) + "…"
+                : m.getContent()))
             .collect(Collectors.joining("\n"));
 
         // Call Claude to summarize

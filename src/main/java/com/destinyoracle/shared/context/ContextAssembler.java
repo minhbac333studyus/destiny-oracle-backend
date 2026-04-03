@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 /**
@@ -31,14 +32,15 @@ public class ContextAssembler {
 
     private static final Logger log = LoggerFactory.getLogger(ContextAssembler.class);
 
-    private static final int HARD_CAP = 4000;
+    private static final int HARD_CAP = 4500;
     private static final int SYSTEM_BUDGET = 300;
+    private static final int SYSTEM_BUDGET_WITH_ACTIONS = 600;  // when ACTION addendum is injected
     private static final int USER_MSG_BUDGET = 200;
     private static final int PLAN_BUDGET = 300;
-    private static final int RECENT_BUDGET = 1500;
-    private static final int MEM0_BUDGET = 400;
+    private static final int RECENT_BUDGET = 800;
+    private static final int MEM0_BUDGET = 300;
     private static final int SUMMARY_BUDGET = 300;
-    private static final int RECENT_MSG_COUNT = 10;
+    private static final int RECENT_MSG_COUNT = 4;
 
     private final TokenCounter tokenCounter;
     private final AiMessageRepository messageRepo;
@@ -60,26 +62,69 @@ public class ContextAssembler {
         this.mem0Client = mem0Client;
     }
 
-    private static final String SYSTEM_PROMPT = """
-        You are Destiny Oracle, an AI personal growth assistant. You help users with:
-        - Workout plans, meal plans, daily routines
-        - Task management and habit tracking
-        - Smart reminders and scheduling
-        - Personal growth coaching tied to their Destiny Cards
+    /** Base system prompt — always included. Kept lean for general conversations. */
+    private static final String SYSTEM_PROMPT_BASE = """
+You help users with:
+- Workout plans, meal plans, daily routines
+- Task management and habit tracking
+- Smart reminders and scheduling
+- Personal growth coaching tied to their dream
 
-        When the user asks for a plan (workout, meal, routine), generate it in structured JSON.
-        When the user wants a reminder, extract the time and create it.
-        When the user asks about an existing plan, check their saved plans first.
+FORMATTING RULES:
+- NEVER output raw JSON. Always format plans as clean, readable markdown.
+- For meal plans: use markdown tables with columns for Meal, Foods, Calories, Macros.
+- For workout plans: use markdown tables with columns for Exercise, Sets, Reps, Rest.
+- Use **bold** for section headers, bullet points for tips.
+- Keep each day concise — one table per day, not walls of text.
+- At the end of a plan, suggest follow-up actions on separate lines starting with ">>": \
+e.g. ">> Generate shopping list" or ">> Create reminder cards"
+- When the user follow a previous message or plan, \
+execute the action concisely — do NOT repeat the previous plan content. \
+Just do what they asked.
 
-        Be warm, encouraging, and concise. Use emoji sparingly.
-        Always consider the user's known preferences and physical limitations from memory.
-        """;
+When the user asks about an existing plan, check their saved plans first.
+Be warm, encouraging, and concise.
 
-    public AssembledContext assemble(UUID userId, UUID conversationId, String newUserMessage) {
+CRITICAL: Always check the "Known facts about user" section below. \
+If it mentions an eating window, meal timing, dietary protocol (e.g. Blueprint), or schedule preferences — \
+you MUST follow them. Never generate plans that contradict the user's known preferences.
+""";
+
+    /**
+     * Addendum injected ONLY when intent is TASK or REMINDER.
+     * Saves ~200 tokens on all general conversations.
+     */
+    private static final String ACTION_ADDENDUM = """
+
+Include [ACTION]{json}[/ACTION] blocks at END of response (invisible to user, triggers backend creation).
+Types: REMINDER{title,body?,scheduledAt} | TASK{name,category,steps:[{title,description}]} | PLAN{name,planType,content}
+Categories: WORKOUT/MEAL/SHOPPING/HABIT/STUDY/CUSTOM. PlanTypes: WORKOUT/MEAL/ROUTINE/SHOPPING/CUSTOM.
+Use ISO datetime for scheduledAt. Calculate relative dates from current date below. Multiple blocks allowed.
+ALWAYS include [ACTION] — the user expects the item to be created.
+""";
+
+    /**
+     * Assembles the full context for a chat request.
+     *
+     * @param intent The classified intent (TASK, REMINDER, GENERAL, etc.) — drives prompt chaining.
+     *               When intent is TASK or REMINDER, ACTION block instructions + current datetime are injected.
+     *               For all other intents, only the lean base prompt is used (saves ~200 tokens).
+     */
+    public AssembledContext assemble(UUID userId, UUID conversationId, String newUserMessage, String intent) {
+        long assembleStart = System.currentTimeMillis();
         int usedTokens = 0;
 
-        // Layer 1: System prompt (always present)
-        String system = tokenCounter.truncateToFit(SYSTEM_PROMPT, SYSTEM_BUDGET);
+        // Layer 1: System prompt — conditionally chain ACTION addendum based on intent
+        boolean needsActions = "TASK".equals(intent) || "REMINDER".equals(intent) || "PLAN_SAVE".equals(intent);
+        StringBuilder systemBuilder = new StringBuilder(SYSTEM_PROMPT_BASE);
+        if (needsActions) {
+            systemBuilder.append(ACTION_ADDENDUM);
+            systemBuilder.append("\nCurrent date/time: ")
+                .append(java.time.LocalDateTime.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm (EEEE)")));
+        }
+        int sysBudget = needsActions ? SYSTEM_BUDGET_WITH_ACTIONS : SYSTEM_BUDGET;
+        String system = tokenCounter.truncateToFit(systemBuilder.toString(), sysBudget);
         usedTokens += tokenCounter.estimate(system);
 
         // Layer 2: User message (always present)
@@ -87,14 +132,17 @@ public class ContextAssembler {
         usedTokens += tokenCounter.estimate(userMsg);
 
         // Layer 3: Saved plan context (if relevant plan exists)
+        long planStart = System.currentTimeMillis();
         String planContext = "";
         if (newUserMessage != null) {
             planContext = findRelevantPlanContext(userId, newUserMessage);
             planContext = tokenCounter.truncateToFit(planContext, PLAN_BUDGET);
             usedTokens += tokenCounter.estimate(planContext);
         }
+        log.info("[TIMING] Layer 3 - Saved plans query: {}ms", System.currentTimeMillis() - planStart);
 
         // Layer 4: Recent uncompressed messages
+        long recentStart = System.currentTimeMillis();
         List<AssembledContext.MessagePair> recentMessages = new ArrayList<>();
         if (conversationId != null) {
             List<AiMessage> recent = messageRepo.findRecentUncompressed(conversationId, RECENT_MSG_COUNT);
@@ -108,11 +156,17 @@ public class ContextAssembler {
             }
             usedTokens += recentTokens;
         }
+        log.info("[TIMING] Layer 4 - Recent messages query: {}ms (found {} msgs)", System.currentTimeMillis() - recentStart, recentMessages.size());
 
-        // Layer 5: Mem0 long-term memories
+        // Layer 5: Mem0 long-term memories (with 8s timeout to avoid blocking chat)
+        long mem0Start = System.currentTimeMillis();
         String mem0Memories = "";
         try {
-            var memories = mem0Client.searchMemories(userId, newUserMessage, 5);
+            var future = CompletableFuture.supplyAsync(
+                () -> mem0Client.searchMemories(userId, newUserMessage, 8));
+            var memories = future.get(8, TimeUnit.SECONDS);
+            long mem0Elapsed = System.currentTimeMillis() - mem0Start;
+            log.info("[TIMING] Layer 5 - Mem0 search: {}ms (found {} memories)", mem0Elapsed, memories.size());
             if (!memories.isEmpty()) {
                 mem0Memories = memories.stream()
                     .map(Mem0Client.Mem0Memory::memory)
@@ -120,11 +174,14 @@ public class ContextAssembler {
                 mem0Memories = tokenCounter.truncateToFit(mem0Memories, MEM0_BUDGET);
                 usedTokens += tokenCounter.estimate(mem0Memories);
             }
+        } catch (TimeoutException e) {
+            log.warn("[TIMING] Layer 5 - Mem0 search TIMED OUT after {}ms", System.currentTimeMillis() - mem0Start);
         } catch (Exception e) {
-            log.debug("Mem0 unavailable, skipping long-term memory: {}", e.getMessage());
+            log.warn("[TIMING] Layer 5 - Mem0 FAILED after {}ms: {}", System.currentTimeMillis() - mem0Start, e.getMessage());
         }
 
         // Layer 6: Session summary (compressed older messages)
+        long summaryStart = System.currentTimeMillis();
         String sessionSummary = "";
         if (conversationId != null) {
             var summaries = memoryRepo.findByConversationIdOrderByCompressionRound(conversationId);
@@ -137,8 +194,10 @@ public class ContextAssembler {
                 usedTokens += tokenCounter.estimate(sessionSummary);
             }
         }
+        log.info("[TIMING] Layer 6 - Session summary query: {}ms", System.currentTimeMillis() - summaryStart);
 
-        log.debug("Context assembled: {} tokens (cap: {})", usedTokens, HARD_CAP);
+        long totalElapsed = System.currentTimeMillis() - assembleStart;
+        log.info("[TIMING] Context assembly TOTAL: {}ms | {} tokens (cap: {})", totalElapsed, usedTokens, HARD_CAP);
 
         return new AssembledContext(
             system, userMsg, planContext, recentMessages,

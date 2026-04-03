@@ -27,16 +27,37 @@ public class Mem0Client {
 
     private final RestClient restClient;
 
+    private final String baseUrl;
+
     /** Primary constructor for Spring injection. */
     @Autowired
     public Mem0Client(
         @Value("${mem0.base-url:http://localhost:8888}") String baseUrl
     ) {
-        this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+        this.baseUrl = baseUrl;
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(5));
+        factory.setReadTimeout(java.time.Duration.ofSeconds(10));
+
+        // Mem0 sometimes returns application/octet-stream instead of application/json.
+        // Add a StringHttpMessageConverter that accepts ALL content types so RestClient never rejects.
+        var allTypesStringConverter = new org.springframework.http.converter.StringHttpMessageConverter();
+        allTypesStringConverter.setSupportedMediaTypes(List.of(
+            org.springframework.http.MediaType.ALL
+        ));
+
+        this.restClient = RestClient.builder()
+            .baseUrl(baseUrl)
+            .requestFactory(factory)
+            .messageConverters(converters -> {
+                converters.addFirst(allTypesStringConverter);
+            })
+            .build();
     }
 
     /** Constructor accepting a pre-built RestClient (for tests with WireMock). */
     public Mem0Client(RestClient restClient) {
+        this.baseUrl = "";
         this.restClient = restClient;
     }
 
@@ -82,15 +103,21 @@ public class Mem0Client {
                 "user_id", userId
             );
 
-            var response = restClient.post()
-                .uri("/memories")
+            var rawResponse = restClient.post()
+                .uri("/v1/memories/")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()
-                .body(Mem0AddResponse.class);
+                .body(String.class);
 
-            return response != null && response.results() != null
-                ? response.results()
+            if (rawResponse == null || rawResponse.isBlank()) return Collections.emptyList();
+
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            var parsed = mapper.readValue(rawResponse, Mem0AddResponse.class);
+            log.debug("Mem0 addMemory success for user {}: {} results", userId,
+                parsed != null && parsed.results() != null ? parsed.results().size() : 0);
+            return parsed != null && parsed.results() != null
+                ? parsed.results()
                 : Collections.emptyList();
         } catch (Exception e) {
             log.warn("Mem0 addMemory failed for user {}: {}", userId, e.getMessage());
@@ -116,6 +143,7 @@ public class Mem0Client {
         return searchMemoriesRaw(userId.toString(), query, limit);
     }
 
+    @SuppressWarnings("unchecked")
     private List<Mem0Memory> searchMemoriesRaw(String userId, String query, int limit) {
         try {
             var body = Map.of(
@@ -124,16 +152,28 @@ public class Mem0Client {
                 "limit", limit
             );
 
-            var response = restClient.post()
-                .uri("/memories/search")
+            // /v1/memories/search/ returns a raw JSON array (not wrapped in {"results": [...]})
+            var raw = restClient.post()
+                .uri("/v1/memories/search/")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()
-                .body(Mem0SearchResponse.class);
+                .body(List.class);
 
-            return response != null && response.results() != null
-                ? response.results()
-                : Collections.emptyList();
+            if (raw == null) return Collections.emptyList();
+            return ((List<Object>) raw).stream()
+                .filter(item -> item instanceof Map)
+                .map(item -> {
+                    @SuppressWarnings("unchecked")
+                    var m = (Map<String, Object>) item;
+                    return new Mem0Memory(
+                        String.valueOf(m.getOrDefault("id", "")),
+                        String.valueOf(m.getOrDefault("memory", "")),
+                        m.get("hash") != null ? String.valueOf(m.get("hash")) : null,
+                        m.get("score") instanceof Number n ? n.doubleValue() : null
+                    );
+                })
+                .collect(Collectors.toList());
         } catch (Exception e) {
             log.warn("Mem0 searchMemories failed for user {}: {}", userId, e.getMessage());
             return Collections.emptyList();
@@ -143,16 +183,34 @@ public class Mem0Client {
     /**
      * Get all memories for a user.
      */
+    @SuppressWarnings("unchecked")
     public List<Mem0Memory> getAllMemories(UUID userId) {
         try {
-            var response = restClient.get()
-                .uri("/memories?user_id={userId}", userId.toString())
+            // Mem0 GET /v1/memories/ may return a raw JSON array or {"results": [...]}
+            var rawResponse = restClient.get()
+                .uri("/v1/memories/?user_id={userId}", userId.toString())
                 .retrieve()
-                .body(Mem0SearchResponse.class);
+                .body(String.class);
 
-            return response != null && response.results() != null
-                ? response.results()
-                : Collections.emptyList();
+            if (rawResponse == null || rawResponse.isBlank()) return Collections.emptyList();
+
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            var tree = mapper.readTree(rawResponse);
+
+            // Handle both formats: raw array [...] or wrapped {"results": [...]}
+            var arrayNode = tree.isArray() ? tree : (tree.has("results") ? tree.get("results") : null);
+            if (arrayNode == null || !arrayNode.isArray()) return Collections.emptyList();
+
+            List<Mem0Memory> result = new java.util.ArrayList<>();
+            for (var node : arrayNode) {
+                result.add(new Mem0Memory(
+                    node.has("id") ? node.get("id").asText() : "",
+                    node.has("memory") ? node.get("memory").asText() : "",
+                    node.has("hash") ? node.get("hash").asText() : null,
+                    node.has("score") ? node.get("score").asDouble() : null
+                ));
+            }
+            return result;
         } catch (Exception e) {
             log.warn("Mem0 getAllMemories failed for user {}: {}", userId, e.getMessage());
             return Collections.emptyList();
@@ -165,7 +223,7 @@ public class Mem0Client {
     public void deleteMemory(String memoryId) {
         try {
             restClient.delete()
-                .uri("/memories/{memoryId}", memoryId)
+                .uri("/v1/memories/{memoryId}/", memoryId)
                 .retrieve()
                 .toBodilessEntity();
         } catch (Exception e) {
@@ -179,7 +237,7 @@ public class Mem0Client {
     public void deleteAllMemories(UUID userId) {
         try {
             restClient.delete()
-                .uri("/memories?user_id={userId}", userId.toString())
+                .uri("/v1/memories/?user_id={userId}", userId.toString())
                 .retrieve()
                 .toBodilessEntity();
         } catch (Exception e) {

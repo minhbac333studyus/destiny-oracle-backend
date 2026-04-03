@@ -5,6 +5,9 @@ import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -33,6 +36,7 @@ public class DailyInsight {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;  // AI-generated summary
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String suggestions;  // JSON array of suggestions
 

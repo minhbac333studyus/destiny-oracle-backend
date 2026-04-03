@@ -12,10 +12,10 @@ import org.springframework.context.annotation.Primary;
  * Two ChatClient beans:
  *
  *   "ollamaChatClient" (PRIMARY) — Qwen via Ollama, $0 cost.
- *       → AI Chat, Conversation Compressor, Insight Scheduler
+ *       → Conversation Compressor, Insight Scheduler
  *
- *   "anthropicChatClient" — Claude Haiku, paid but high quality.
- *       → Image Prompt generation, Stage Content generation
+ *   "anthropicChatClient" — Claude Haiku, fast + high quality.
+ *       → AI Chat (AiChatServiceImpl), Image Prompt generation, Stage Content generation
  */
 @Configuration
 public class AiClientConfig {
@@ -33,7 +33,7 @@ public class AiClientConfig {
 
     /**
      * Secondary. Must be injected with @Qualifier("anthropicChatClient").
-     * Used by: ImagePromptServiceImpl, StageContentGenerationServiceImpl
+     * Used by: ImagePromptServiceImpl
      */
     @Bean
     @Qualifier("anthropicChatClient")

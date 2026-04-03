@@ -1,7 +1,7 @@
 package com.destinyoracle.scheduler;
 
-import com.destinyoracle.entity.DestinyCard;
-import com.destinyoracle.repository.DestinyCardRepository;
+import com.destinyoracle.domain.card.entity.DestinyCard;
+import com.destinyoracle.domain.card.repository.DestinyCardRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;

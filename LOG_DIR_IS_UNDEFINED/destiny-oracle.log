@@ -1,0 +1,6 @@
+2026-03-27 19:07:43.681  INFO rtingClassPathChangeChangedEventListener : Restarting due to 268 class path changes (0 additions, 4 deletions, 264 modifications)
+2026-03-27 19:07:43.687  INFO o.a.coyote.http11.Http11NioProtocol      : Stopping ProtocolHandler ["http-nio-8080"]
+2026-03-27 19:07:43.710  INFO j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-03-27 19:07:43.710 DEBUG o.hibernate.internal.SessionFactoryImpl  : HHH000031: Closing
+2026-03-27 19:07:43.711 DEBUG o.h.s.i.AbstractServiceRegistryImpl      : Implicitly destroying ServiceRegistry on de-registration of all child ServiceRegistries
+2026-03-27 19:07:43.711 DEBUG o.h.b.r.i.BootstrapServiceRegistryImpl   : Implicitly destroying Boot-strap registry on de-registration of all child ServiceRegistries

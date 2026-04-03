@@ -1,8 +1,8 @@
 package com.destinyoracle.shared.xp;
 
-import com.destinyoracle.entity.CardStage;
-import com.destinyoracle.entity.DestinyCard;
-import com.destinyoracle.repository.DestinyCardRepository;
+import com.destinyoracle.domain.card.entity.CardStage;
+import com.destinyoracle.domain.card.entity.DestinyCard;
+import com.destinyoracle.domain.card.repository.DestinyCardRepository;
 import com.destinyoracle.shared.event.StageAdvancedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

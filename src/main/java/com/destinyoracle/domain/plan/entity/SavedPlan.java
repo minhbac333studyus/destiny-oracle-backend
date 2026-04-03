@@ -44,8 +44,8 @@ public class SavedPlan {
     @Column(columnDefinition = "TEXT")
     private String description;  // AI-generated summary
 
-    @Column(nullable = false, columnDefinition = "jsonb")
-    private String content;  // The actual plan — structured JSON
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String content;  // The plan content (markdown or JSON)
 
     @Column(nullable = false)
     @Builder.Default

@@ -5,5 +5,6 @@ RUN pip install --no-cache-dir \
     rank-bm25 \
     langchain-neo4j \
     neo4j \
-    ollama
+    ollama \
+    anthropic
 COPY main.py /app/main.py

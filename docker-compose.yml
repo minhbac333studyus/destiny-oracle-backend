@@ -65,6 +65,8 @@ services:
       - MEM0_POSTGRES_PASSWORD=${MEM0_POSTGRES_PASSWORD:-mem0pass}
       - MEM0_NEO4J_PASSWORD=${MEM0_NEO4J_PASSWORD:-mem0graph}
       - MEM0_CONFIG_PATH=/app/config.yaml
+      - LLM_MODEL=${MEM0_LLM_MODEL:-claude-haiku-4-5-20251001}
+      - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
       - mem0_history:/app/history
       - ./mem0/config.yaml:/app/config.yaml:ro

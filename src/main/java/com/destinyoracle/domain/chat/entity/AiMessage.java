@@ -2,6 +2,8 @@ package com.destinyoracle.domain.chat.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -37,6 +39,7 @@ public class AiMessage {
     @Column(length = 50)
     private String actionType;  // null, "TASK", "REMINDER", "LIST", "INSIGHT"
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String actionPayload;
 

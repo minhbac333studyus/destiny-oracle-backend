@@ -1,7 +1,9 @@
 package com.destinyoracle;
 
-import com.destinyoracle.entity.*;
-import com.destinyoracle.repository.*;
+import com.destinyoracle.domain.card.entity.*;
+import com.destinyoracle.domain.user.entity.*;
+import com.destinyoracle.domain.card.repository.*;
+import com.destinyoracle.domain.user.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -68,36 +70,10 @@ public class DataSeeder implements ApplicationRunner {
 
         card = destinyCardRepository.save(card);
 
-        // Seed stage content for all 6 stages
-        seedStageContent(card, CardStage.storm,
-                "The Midnight Spiral",
-                "When the weight of who you're not crushes who you could be",
-                "In the darkest hour before transformation, fear wears the face of certainty — whispering that this is all there is. The cards are heavy with the weight of unlived dreams, but within that weight lies the seed of everything. You are not broken; you are breaking open.");
-
-        seedStageContent(card, CardStage.fog,
-                "Lost in the In-Between",
-                "The old self is gone; the new self hasn't arrived yet",
-                "Between the person you were and the person you are becoming, there is a sacred disorientation. Nothing is clear yet everything is shifting — old patterns dissolve while new ones form in the silence. Trust the fog; it is doing its holy work.");
-
-        seedStageContent(card, CardStage.clearing,
-                "First Light",
-                "A single ray of truth breaks through the clouds",
-                "The first honest moment arrives like dawn — quiet, unmistakable, revolutionary. You see yourself without the armor and realize the armor was never keeping you safe, it was keeping you small. This clarity is your compass from here forward.");
-
-        seedStageContent(card, CardStage.aura,
-                "The Awakening",
-                "You begin to recognize your own power",
-                "Something ancient and electric begins to move through you, recognizing itself in mirrors, in strangers, in the night sky. You are not just changing — you are remembering. The energy that moves mountains has always lived inside you.");
-
-        seedStageContent(card, CardStage.radiance,
-                "Golden Becoming",
-                "Your presence lights up every room you enter",
-                "You have stopped waiting for permission. Your gifts flow freely now, touching lives in ways you can no longer track or contain. The world feels your presence before you speak, and your joy has become a form of service.");
-
-        seedStageContent(card, CardStage.legend,
-                "The Living Myth",
-                "You have become the story others tell to find courage",
-                "There is a chapter of your life that future generations will speak of — the season you chose courage over comfort, truth over approval, becoming over belonging. You are no longer just living your story; you are the story that helps others find theirs.");
+        // Seed stage content for all 6 stages (empty placeholders — AI generates action scenes)
+        for (CardStage stage : CardStage.values()) {
+            seedStageContent(card, stage);
+        }
 
         // Seed card images for all 6 stages
         for (CardStage stage : CardStage.values()) {
@@ -114,15 +90,10 @@ public class DataSeeder implements ApplicationRunner {
         log.info("Demo card seeded successfully: {}", DEMO_ASPECT_KEY);
     }
 
-    private void seedStageContent(DestinyCard card, CardStage stage,
-                                   String title, String tagline, String lore) {
+    private void seedStageContent(DestinyCard card, CardStage stage) {
         CardStageContent content = CardStageContent.builder()
                 .card(card)
                 .stage(stage)
-                .title(title)
-                .tagline(tagline)
-                .lore(lore)
-                .imagePrompt(null)
                 .generatedAt(Instant.now())
                 .build();
         cardStageContentRepository.save(content);

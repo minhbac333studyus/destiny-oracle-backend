@@ -4,7 +4,7 @@ import com.destinyoracle.domain.plan.entity.NudgeState;
 import com.destinyoracle.domain.plan.entity.PlanSchedule;
 import com.destinyoracle.domain.plan.repository.NudgeStateRepository;
 import com.destinyoracle.domain.plan.repository.PlanScheduleRepository;
-import com.destinyoracle.service.PushNotificationService;
+import com.destinyoracle.domain.notification.service.PushNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;

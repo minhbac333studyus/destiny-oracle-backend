@@ -1,6 +1,6 @@
 package com.destinyoracle.config;
 
-import com.destinyoracle.service.ImageProvider;
+import com.destinyoracle.domain.card.service.ImageProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
