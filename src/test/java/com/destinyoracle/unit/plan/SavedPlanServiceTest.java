@@ -6,7 +6,7 @@ import com.destinyoracle.domain.plan.repository.SavedPlanRepository;
 import com.destinyoracle.dto.request.SavePlanRequest;
 import com.destinyoracle.dto.request.UpdatePlanRequest;
 import com.destinyoracle.dto.response.SavedPlanResponse;
-import com.destinyoracle.service.impl.SavedPlanServiceImpl;
+import com.destinyoracle.domain.plan.service.impl.SavedPlanServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;

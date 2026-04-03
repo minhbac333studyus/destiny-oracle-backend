@@ -2,7 +2,7 @@ package com.destinyoracle.unit.task;
 
 import com.destinyoracle.domain.task.entity.*;
 import com.destinyoracle.domain.task.repository.*;
-import com.destinyoracle.service.impl.TaskServiceImpl;
+import com.destinyoracle.domain.task.service.impl.TaskServiceImpl;
 import com.destinyoracle.shared.xp.XpCalculator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

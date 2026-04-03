@@ -2,7 +2,7 @@ package com.destinyoracle.unit.nudge;
 
 import com.destinyoracle.domain.plan.entity.*;
 import com.destinyoracle.domain.plan.repository.*;
-import com.destinyoracle.service.PushNotificationService;
+import com.destinyoracle.domain.notification.service.PushNotificationService;
 import com.destinyoracle.scheduler.NudgeScheduler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

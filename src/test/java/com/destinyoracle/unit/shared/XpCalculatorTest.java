@@ -1,8 +1,8 @@
 package com.destinyoracle.unit.shared;
 
-import com.destinyoracle.entity.CardStage;
-import com.destinyoracle.entity.DestinyCard;
-import com.destinyoracle.repository.DestinyCardRepository;
+import com.destinyoracle.domain.card.entity.CardStage;
+import com.destinyoracle.domain.card.entity.DestinyCard;
+import com.destinyoracle.domain.card.repository.DestinyCardRepository;
 import com.destinyoracle.shared.xp.XpCalculator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -3,11 +3,11 @@
 
   <!-- Register Spring Boot's %clr color converter -->
   <conversionRule conversionWord="clr"
-                  converterClass="org.springframework.boot.logging.logback.ColorConverter"/>
+                  class="org.springframework.boot.logging.logback.ColorConverter"/>
   <conversionRule conversionWord="wex"
-                  converterClass="org.springframework.boot.logging.logback.WhitespaceThrowableProxyConverter"/>
+                  class="org.springframework.boot.logging.logback.WhitespaceThrowableProxyConverter"/>
   <conversionRule conversionWord="wEx"
-                  converterClass="org.springframework.boot.logging.logback.ExtendedWhitespaceThrowableProxyConverter"/>
+                  class="org.springframework.boot.logging.logback.ExtendedWhitespaceThrowableProxyConverter"/>
 
   <!-- ── Properties ──────────────────────────────────────────────────────── -->
   <springProperty scope="context" name="APP_NAME"  source="spring.application.name" defaultValue="destiny-oracle"/>
@@ -87,28 +87,28 @@
   <!-- ══════════════════════════════════════════════════════════════════════ -->
   <!--  LOGGER — AI pipeline classes → both main log + dedicated pipeline.log-->
   <!-- ══════════════════════════════════════════════════════════════════════ -->
-  <logger name="com.destinyoracle.service.impl.CardImageGenerationServiceImpl"
+  <logger name="com.destinyoracle.domain.card.service.impl.CardImageGenerationServiceImpl"
           level="DEBUG" additivity="false">
     <appender-ref ref="CONSOLE"/>
     <appender-ref ref="FILE"/>
     <appender-ref ref="PIPELINE_FILE"/>
   </logger>
 
-  <logger name="com.destinyoracle.service.impl.ImagePromptServiceImpl"
+  <logger name="com.destinyoracle.domain.card.service.impl.ImagePromptServiceImpl"
           level="DEBUG" additivity="false">
     <appender-ref ref="CONSOLE"/>
     <appender-ref ref="FILE"/>
     <appender-ref ref="PIPELINE_FILE"/>
   </logger>
 
-  <logger name="com.destinyoracle.service.impl.JobStepUpdater"
+  <logger name="com.destinyoracle.domain.card.service.impl.JobStepUpdater"
           level="DEBUG" additivity="false">
     <appender-ref ref="CONSOLE"/>
     <appender-ref ref="FILE"/>
     <appender-ref ref="PIPELINE_FILE"/>
   </logger>
 
-  <logger name="com.destinyoracle.service.impl.GenerationJobServiceImpl"
+  <logger name="com.destinyoracle.domain.card.service.impl.GenerationJobServiceImpl"
           level="DEBUG" additivity="false">
     <appender-ref ref="CONSOLE"/>
     <appender-ref ref="FILE"/>

@@ -27,12 +27,13 @@ class Mem0ClientTest {
 
     @Test
     void searchMemories_returnsFormattedFacts() {
-        stubFor(post("/memories/search")
+        // Mem0 v1 API returns a raw JSON array (not wrapped in {"results": [...]})
+        stubFor(post("/v1/memories/search/")
             .willReturn(okJson("""
-                {"results": [
+                [
                     {"memory": "User is vegetarian", "score": 0.92},
                     {"memory": "User has bad left knee", "score": 0.87}
-                ]}
+                ]
                 """)));
 
         String result = mem0.searchMemories("00000000-0000-0000-0000-000000000001", "leg workout");
@@ -44,10 +45,8 @@ class Mem0ClientTest {
 
     @Test
     void searchMemories_emptyResults_returnsEmptyString() {
-        stubFor(post("/memories/search")
-            .willReturn(okJson("""
-                {"results": []}
-                """)));
+        stubFor(post("/v1/memories/search/")
+            .willReturn(okJson("[]")));
 
         String result = mem0.searchMemories("00000000-0000-0000-0000-000000000001", "random query");
 
@@ -56,7 +55,7 @@ class Mem0ClientTest {
 
     @Test
     void searchMemories_serverDown_returnsEmptyGracefully() {
-        stubFor(post("/memories/search")
+        stubFor(post("/v1/memories/search/")
             .willReturn(serverError()));
 
         String result = mem0.searchMemories("00000000-0000-0000-0000-000000000001", "query");
@@ -66,7 +65,7 @@ class Mem0ClientTest {
 
     @Test
     void addMemory_sendsCorrectPayload() {
-        stubFor(post("/memories")
+        stubFor(post("/v1/memories/")
             .willReturn(okJson("""
                 {"results": [{"id": "mem-1", "memory": "User is vegetarian"}]}
                 """)));
@@ -74,7 +73,7 @@ class Mem0ClientTest {
         // Should not throw
         mem0.addMemory("00000000-0000-0000-0000-000000000001", "I am vegetarian", "Got it, noted.");
 
-        verify(postRequestedFor(urlEqualTo("/memories"))
+        verify(postRequestedFor(urlEqualTo("/v1/memories/"))
             .withRequestBody(matchingJsonPath("$.user_id", equalTo("00000000-0000-0000-0000-000000000001")))
             .withRequestBody(matchingJsonPath("$.messages[0].role", equalTo("user")))
             .withRequestBody(matchingJsonPath("$.messages[0].content",

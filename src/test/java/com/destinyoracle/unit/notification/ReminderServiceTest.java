@@ -4,7 +4,7 @@ import com.destinyoracle.domain.notification.entity.Reminder;
 import com.destinyoracle.domain.notification.repository.ReminderRepository;
 import com.destinyoracle.dto.request.CreateReminderRequest;
 import com.destinyoracle.dto.response.ReminderResponse;
-import com.destinyoracle.service.impl.ReminderServiceImpl;
+import com.destinyoracle.domain.notification.service.impl.ReminderServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
