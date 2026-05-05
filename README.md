@@ -189,6 +189,7 @@ ng serve              # http://localhost:4200
 | GET | `/api/v1/cards/{id}` | Full card detail with stats |
 | PATCH | `/api/v1/cards/{id}` | Update fear/dream text, label, icon |
 | DELETE | `/api/v1/cards/{id}` | Remove card |
+| GET | `/api/v1/cards/aspects` | Available aspects with `alreadyAdded` flag per user |
 
 ### AI Image Pipeline
 
@@ -429,7 +430,10 @@ Options: `claude-3-5-haiku-latest` (cheap) · `claude-3-5-sonnet-latest` (better
 
 ```
 destiny_cards                     — one per user per aspect
-  └── prompt_status               — NONE | GENERATING | READY | FAILED
+  ├── prompt_status               — NONE | GENERATING | READY | FAILED
+  ├── current_xp                  — XP earned from completing tasks
+  ├── xp_to_next_stage            — threshold for next stage advancement
+  └── stage_advanced_at           — timestamp of last stage change
 
 card_stage_content                — 6 rows per card (one per stage)
   └── image_prompt                — written by Claude (Phase 1)
@@ -561,11 +565,15 @@ destiny-oracle-backend/
 |------|---------------|---------------|
 | **Swagger UI** | http://localhost:8080/swagger-ui.html | Interactive API docs |
 | **Admin Debug** | `GET /api/v1/admin/cards/{id}` | Full card dump: prompts, images, pipeline status |
+| **Admin Cards** | `GET /api/v1/admin/cards` | All cards with summary |
+| **Admin Users** | `GET /api/v1/admin/users` | All users with card counts |
 | **System Health** | `GET /api/v1/admin/system-health` | All services status + metrics |
+| **Storage Usage** | `GET /api/v1/admin/storage-usage` | Docker volume storage metrics |
 | **Mem0 Docs** | http://localhost:8888/docs | Mem0 API explorer |
 | **Neo4j Browser** | http://localhost:7474 | Memory graph (login: `neo4j`/`mem0graph`) |
 | **Mem0 logs** | `docker compose logs -f mem0` | Memory operations |
 | **Ollama logs** | `docker compose logs -f ollama` | Model loading + inference |
+| **Pipeline logs** | `tail -f logs/pipeline.log` | AI image pipeline (prompts + generation) |
 | **Container stats** | `docker stats` | RAM/CPU per container |
 | **Claude usage** | https://console.anthropic.com/settings/usage | API costs |
 
@@ -586,6 +594,65 @@ destiny-oracle-backend/
 ---
 
 ## Recent Changes
+
+### XP & Stage Progression System (New)
+
+Cards now earn XP through the AI Assistant features. Completing task steps and tasks awards XP, which drives stage advancement.
+
+| Transition | XP Required |
+|------------|-------------|
+| Storm → Fog | 100 XP |
+| Fog → Clearing | 200 XP |
+| Clearing → Aura | 300 XP |
+| Aura → Radiance | 500 XP |
+| Radiance → Legend | 800 XP |
+
+- **Task step completed:** +15 XP
+- **Full task completed:** +50 XP
+- New event: `TaskStepCompletedEvent` → triggers XP award + possible stage advance
+- New event: `StageAdvancedEvent` → published when card reaches next stage
+- Implementation: `shared/xp/XpCalculator.java`
+
+### PromptStatus Tracking (New)
+
+New enum on `DestinyCard` prevents duplicate Claude calls during image prompt generation:
+
+```
+NONE → GENERATING → READY
+                  → FAILED (retry allowed)
+```
+
+Concurrent `generate-images` requests are safely rejected while status is `GENERATING`.
+
+### Enhanced Admin Debug Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/admin/cards` | All cards with summary |
+| `GET /api/v1/admin/cards/{id}` | Full card dump: prompts, images, pipeline status |
+| `GET /api/v1/admin/users` | All users with card counts |
+| `GET /api/v1/admin/system-health` | Aggregated health for all services (PostgreSQL, Ollama, Mem0, pgvector, Neo4j, Claude, image provider) |
+| `GET /api/v1/admin/storage-usage` | Docker volume storage metrics |
+
+### Custom Aspects Support
+
+Users can now create fully custom aspect cards. The aspect key is auto-generated from the label. New endpoint: `GET /api/v1/cards/aspects` returns available aspects with `alreadyAdded: true/false` per user.
+
+### Dedicated Pipeline Logging
+
+New `PIPELINE_FILE` appender in `logback-spring.xml` routes AI pipeline logs to `logs/pipeline.log`:
+- `CardImageGenerationServiceImpl`, `ImagePromptServiceImpl`, `JobStepUpdater`, `GenerationJobServiceImpl`
+- Debug with: `tail -f logs/pipeline.log`
+
+### Dual AI Client Configuration
+
+`AiClientConfig` now explicitly defines two `ChatClient` beans:
+- `ollamaChatClient` (PRIMARY) — Qwen via Ollama, $0 cost
+- `anthropicChatClient` — Claude Haiku, for prompts + chat
+
+### Test Coverage
+
+New unit tests covering: `XpCalculator`, `TaskStepToggle`, `TokenCounter`, `IntentClassifier`, `SavedPlanService`, `NudgeScheduler`, `ReminderService`, `Mem0Client`.
 
 ### Architecture Refactor: Full Domain-Driven Design
 
