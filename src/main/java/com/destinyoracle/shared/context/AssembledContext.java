@@ -12,7 +12,8 @@ public record AssembledContext(
     String savedPlanContext,      // Layer 3: relevant saved plan (if any)
     List<MessagePair> recentMessages,  // Layer 4: last N raw messages
     String mem0Memories,          // Layer 5: long-term memories from Mem0
-    String sessionSummary,        // Layer 6: compressed older messages
+    String nutritionContext,      // Layer 6: calorie/macro targets
+    String sessionSummary,        // Layer 7: compressed older messages
     int totalTokenEstimate
 ) {
     public record MessagePair(String role, String content) {}

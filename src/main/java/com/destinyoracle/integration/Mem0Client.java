@@ -36,8 +36,8 @@ public class Mem0Client {
     ) {
         this.baseUrl = baseUrl;
         var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(java.time.Duration.ofSeconds(5));
-        factory.setReadTimeout(java.time.Duration.ofSeconds(10));
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(1));
+        factory.setReadTimeout(java.time.Duration.ofSeconds(2));
 
         // Mem0 sometimes returns application/octet-stream instead of application/json.
         // Add a StringHttpMessageConverter that accepts ALL content types so RestClient never rejects.

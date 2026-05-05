@@ -14,8 +14,11 @@ import com.destinyoracle.domain.plan.entity.SavedPlan;
 import com.destinyoracle.dto.request.SavePlanRequest;
 import com.destinyoracle.domain.chat.service.AiChatService;
 import com.destinyoracle.domain.plan.service.SavedPlanService;
+import com.destinyoracle.domain.dailyplan.service.DailyPlanAiService;
+import com.destinyoracle.domain.dailyplan.service.DailyPlanService;
 import com.destinyoracle.domain.task.service.TaskService;
 import com.destinyoracle.domain.task.service.TaskService.StepInput;
+import com.destinyoracle.shared.ai.AiContextRouter;
 import com.destinyoracle.shared.ai.ConversationCompressor;
 import com.destinyoracle.shared.ai.IntentClassifier;
 import com.destinyoracle.shared.context.AssembledContext;
@@ -50,12 +53,15 @@ public class AiChatServiceImpl implements AiChatService {
     private final AiConversationRepository conversationRepo;
     private final AiMessageRepository messageRepo;
     private final ContextAssembler contextAssembler;
+    private final AiContextRouter contextRouter;
     private final IntentClassifier intentClassifier;
     private final ConversationCompressor compressor;
     private final Mem0Client mem0Client;
     private final com.destinyoracle.shared.context.TokenCounter tokenCounter;
     private final TaskService taskService;
     private final SavedPlanService savedPlanService;
+    private final DailyPlanAiService dailyPlanAiService;
+    private final DailyPlanService dailyPlanService;
     private final ReminderRepository reminderRepo;
 
     public AiChatServiceImpl(
@@ -65,12 +71,15 @@ public class AiChatServiceImpl implements AiChatService {
         AiConversationRepository conversationRepo,
         AiMessageRepository messageRepo,
         ContextAssembler contextAssembler,
+        AiContextRouter contextRouter,
         IntentClassifier intentClassifier,
         ConversationCompressor compressor,
         Mem0Client mem0Client,
         com.destinyoracle.shared.context.TokenCounter tokenCounter,
         TaskService taskService,
         SavedPlanService savedPlanService,
+        DailyPlanAiService dailyPlanAiService,
+        DailyPlanService dailyPlanService,
         ReminderRepository reminderRepo
     ) {
         this.anthropicClient = anthropicBuilder.build();
@@ -79,12 +88,15 @@ public class AiChatServiceImpl implements AiChatService {
         this.conversationRepo = conversationRepo;
         this.messageRepo = messageRepo;
         this.contextAssembler = contextAssembler;
+        this.contextRouter = contextRouter;
         this.intentClassifier = intentClassifier;
         this.compressor = compressor;
         this.mem0Client = mem0Client;
         this.tokenCounter = tokenCounter;
         this.taskService = taskService;
         this.savedPlanService = savedPlanService;
+        this.dailyPlanAiService = dailyPlanAiService;
+        this.dailyPlanService = dailyPlanService;
         this.reminderRepo = reminderRepo;
     }
 
@@ -124,14 +136,17 @@ public class AiChatServiceImpl implements AiChatService {
         messageRepo.save(userMsg);
         log.info("[TIMING] Step 2 - Save user message: {}ms", System.currentTimeMillis() - saveStart);
 
-        // 3. Classify intent
-        long intentStart = System.currentTimeMillis();
-        IntentClassifier.Intent intent = intentClassifier.classify(message);
-        log.info("[TIMING] Step 3 - Intent classification: {}ms (intent: {})", System.currentTimeMillis() - intentStart, intent);
+        // 3. AI Router — decide which context layers are needed
+        long routerStart = System.currentTimeMillis();
+        var layers = contextRouter.route(message);
+        log.info("[TIMING] Step 3 - AI context routing: {}ms (layers: {})", System.currentTimeMillis() - routerStart, layers);
 
-        // 4. Assemble context — pass intent for prompt chaining (ACTION addendum only for TASK/REMINDER)
+        // 3b. Also classify intent (still needed for ACTION block post-processing)
+        IntentClassifier.Intent intent = intentClassifier.classify(message);
+
+        // 4. Assemble context — only load layers requested by router
         long ctxStart = System.currentTimeMillis();
-        AssembledContext ctx = contextAssembler.assemble(userId, convId, message, intent.name());
+        AssembledContext ctx = contextAssembler.assemble(userId, convId, message, layers);
         log.info("[TIMING] Step 4 - Context assembly: {}ms", System.currentTimeMillis() - ctxStart);
 
         // 5. Build messages for Claude (single merged system message to reduce framing overhead)
@@ -142,6 +157,9 @@ public class AiChatServiceImpl implements AiChatService {
         }
         if (!ctx.mem0Memories().isEmpty()) {
             systemBlock.append("\n\n").append(ctx.mem0Memories());
+        }
+        if (!ctx.nutritionContext().isEmpty()) {
+            systemBlock.append("\n\n").append(ctx.nutritionContext());
         }
         if (!ctx.savedPlanContext().isEmpty()) {
             systemBlock.append("\n\nRelevant saved plan:\n").append(ctx.savedPlanContext());
@@ -163,8 +181,20 @@ public class AiChatServiceImpl implements AiChatService {
         long preStreamElapsed = System.currentTimeMillis() - chatStart;
         log.info("[TIMING] Steps 1-5 TOTAL (before stream): {}ms", preStreamElapsed);
 
-        // 6. Stream response from Claude (with prompt caching for Anthropic)
+        // 5b. Emit routing info to client as first SSE event
         Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
+        try {
+            long routerMs = System.currentTimeMillis() - routerStart;
+            String routeJson = String.format(
+                "[ROUTE]{\"layers\":[%s],\"routerMs\":%d,\"contextTokens\":%d}",
+                layers.stream().map(l -> "\"" + l.name() + "\"").collect(java.util.stream.Collectors.joining(",")),
+                routerMs, ctx.totalTokenEstimate());
+            sink.tryEmitNext(routeJson);
+        } catch (Exception e) {
+            log.debug("Failed to emit route data: {}", e.getMessage());
+        }
+
+        // 6. Stream response from Claude (with prompt caching for Anthropic)
 
         StringBuilder fullResponse = new StringBuilder();
         final long streamStart = System.currentTimeMillis();
@@ -298,6 +328,9 @@ public class AiChatServiceImpl implements AiChatService {
                     } else if ("PLAN".equals(type)) {
                         createPlanFromAction(userId, json);
                         actionsExecuted++;
+                    } else if ("DAILY_PLAN".equals(type)) {
+                        createDailyPlanFromAction(userId, json);
+                        actionsExecuted++;
                     } else {
                         log.warn("Unknown ACTION type '{}' in chat response", type);
                     }
@@ -399,6 +432,30 @@ public class AiChatServiceImpl implements AiChatService {
         var request = new SavePlanRequest(name, planType, null, content, null);
         savedPlanService.savePlan(userId, request);
         log.info("Created plan '{}' ({}) for user {}", name, planType, userId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void createDailyPlanFromAction(UUID userId, java.util.Map<String, Object> json) {
+        String dateStr = (String) json.get("date");
+        java.time.LocalDate date;
+        try {
+            date = dateStr != null ? java.time.LocalDate.parse(dateStr) : java.time.LocalDate.now();
+        } catch (Exception e) {
+            date = java.time.LocalDate.now();
+        }
+
+        // Parse items directly from the ACTION block — no second AI call
+        var items = (List<java.util.Map<String, Object>>) json.get("items");
+        if (items != null && !items.isEmpty()) {
+            try {
+                dailyPlanService.savePlanFromActionBlock(userId, date, items);
+                log.info("Created daily plan with {} items for {} on {} via chat action", items.size(), userId, date);
+            } catch (Exception e) {
+                log.warn("Failed to save daily plan from chat action: {}", e.getMessage());
+            }
+        } else {
+            log.warn("DAILY_PLAN action had no items for user {} on {}", userId, date);
+        }
     }
 
 

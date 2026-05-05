@@ -12,12 +12,13 @@ import java.util.regex.Pattern;
 public class IntentClassifier {
 
     public enum Intent {
-        TASK,       // "create a workout plan", "give me exercises"
-        REMINDER,   // "remind me to...", "set an alarm for..."
-        PLAN_SAVE,  // "save this plan", "save as my leg day"
-        PLAN_QUERY, // "what's my leg day?", "show my workout"
-        INSIGHT,    // "how was my day?", "daily summary"
-        GENERAL     // Everything else
+        TASK,        // "create a workout plan", "give me exercises"
+        REMINDER,    // "remind me to...", "set an alarm for..."
+        PLAN_SAVE,   // "save this plan", "save as my leg day"
+        PLAN_QUERY,  // "what's my leg day?", "show my workout"
+        DAILY_PLAN,  // "plan for today", "generate daily plan"
+        INSIGHT,     // "how was my day?", "daily summary"
+        GENERAL      // Everything else
     }
 
     private static final Pattern REMINDER_PATTERN = Pattern.compile(
@@ -34,6 +35,10 @@ public class IntentClassifier {
 
     private static final Pattern PLAN_QUERY_PATTERN = Pattern.compile(
         "(?i)(what('s| is| are)|show|get|my)\\b.*\\b(plan|workout|routine|leg day|arm day|meal|schedule)"
+    );
+
+    private static final Pattern DAILY_PLAN_PATTERN = Pattern.compile(
+        "(?i)(plan|l\u1ecbch|k\u1ebf ho\u1ea1ch|l\u00ean plan|generate|t\u1ea1o|sinh)\\b.*\\b(h\u00f4m nay|today|ng\u00e0y mai|tomorrow|daily|h\u00e0ng ng\u00e0y|backward)"
     );
 
     private static final Pattern INSIGHT_PATTERN = Pattern.compile(
@@ -54,6 +59,7 @@ public class IntentClassifier {
         if (message == null || message.isBlank()) return Intent.GENERAL;
 
         if (REMINDER_PATTERN.matcher(message).find()) return Intent.REMINDER;
+        if (DAILY_PLAN_PATTERN.matcher(message).find()) return Intent.DAILY_PLAN;
         if (PLAN_SAVE_PATTERN.matcher(message).find()) return Intent.PLAN_SAVE;
         if (PLAN_QUERY_PATTERN.matcher(message).find()) return Intent.PLAN_QUERY;
         if (TASK_PATTERN.matcher(message).find()) return Intent.TASK;
